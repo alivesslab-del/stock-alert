@@ -6,7 +6,8 @@ Telegram 자동 리포트 스크립트
 """
 
 import os, sys, requests, pytz
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from xml.etree import ElementTree as ET
 import yfinance as yf
 
@@ -117,15 +118,31 @@ def fetch_prices():
         return {}
 
 # ── 매크로 RSS 분석 ──────────────────────────────────────────
-def fetch_rss_titles(query, lang='en'):
+def fetch_rss_titles(query, lang='en', hours=48):
     hl  = 'ko' if lang == 'ko' else 'en-US'
     gl  = 'KR' if lang == 'ko' else 'US'
     ced = 'KR:ko' if lang == 'ko' else 'US:en-US'
     url = f"https://news.google.com/rss/search?q={requests.utils.quote(query)}&hl={hl}&gl={gl}&ceid={ced}"
     try:
-        r = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+        r    = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
         root = ET.fromstring(r.content)
-        return [item.findtext('title') or '' for item in root.findall('.//item')[:8]]
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        titles = []
+        for item in root.findall('.//item'):
+            pub = item.findtext('pubDate')
+            if pub:
+                try:
+                    pub_dt = parsedate_to_datetime(pub)
+                    if pub_dt < cutoff:
+                        continue
+                except Exception:
+                    pass
+            title = item.findtext('title') or ''
+            if title:
+                titles.append(title)
+            if len(titles) >= 8:
+                break
+        return titles
     except Exception:
         return []
 
