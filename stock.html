@@ -166,6 +166,25 @@
     .pct-input{width:56px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:13px;text-align:center;font-family:inherit;outline:none;}
     .pct-input:focus{border-color:rgba(124,106,255,.5);}
 
+    /* ── 월 배분 분석 ── */
+    .alloc-analysis-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:4px;}
+    @media(max-width:720px){.alloc-analysis-grid{grid-template-columns:1fr;}}
+    .alloc-ac{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px;}
+    .alloc-ac-title{font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;}
+    .alloc-ac-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+    .alloc-ac-row:last-child{border-bottom:none;}
+    .alloc-ac-row-label{font-size:12px;color:var(--muted);}
+    .alloc-ac-row-val{font-size:12px;font-weight:600;}
+    .alloc-ac-big{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px;}
+    .alloc-ac-sub{font-size:11px;color:var(--muted);}
+    .alloc-tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;}
+    .alloc-tag.buy{background:rgba(52,211,153,.15);color:var(--green);}
+    .alloc-tag.over{background:rgba(248,113,113,.12);color:var(--red);}
+    .alloc-tag.ok{background:rgba(255,255,255,.07);color:var(--muted);}
+    .smart-alloc-btn{width:100%;background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);color:#fff;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:16px;transition:opacity .2s;letter-spacing:-.01em;}
+    .smart-alloc-btn:hover{opacity:.85;}
+    .alloc-item-meta{display:flex;gap:8px;font-size:11px;margin-top:3px;flex-wrap:wrap;align-items:center;}
+
     /* ── 점수 ── */
     /* 요약 카드 */
     .score-summary{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:18px;padding:28px;margin-bottom:20px;}
@@ -629,11 +648,16 @@
       </div>
     </div>
   </div>
+
+  <!-- 분석 카드 3종 -->
+  <div class="alloc-analysis-grid" id="alloc-analysis"></div>
+
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <div class="card-title" style="margin:0">종목별 배분</div>
       <span style="font-size:11px;color:var(--muted)">비율 직접 조정 가능</span>
     </div>
+    <button class="smart-alloc-btn" onclick="smartAlloc()">✨ 스마트 배분 제안  —  매크로 · 리밸런싱 · 저점 매수 반영</button>
     <div id="alloc-body"><div class="empty">포트폴리오에 종목을 추가하면 배분 플랜이 표시됩니다.</div></div>
     <div id="alloc-total" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:none;">
       합계: <span id="alloc-sum" style="color:var(--text);font-weight:600;"></span> / <span id="alloc-budget-label"></span>
@@ -1746,33 +1770,187 @@ function normalizeAlloc() {
   portfolio.forEach((s, i) => { allocPct[s.symbol] = allocPct[s.symbol] || equal + (i===0?rem:0); });
 }
 
+// 포트폴리오 현재 비중 계산
+function calcPortfolioWeights() {
+  const fx = usdKrw || 1450;
+  const vals = portfolio.map(s => {
+    const p  = prices[s.symbol]?.price || s.avgPrice;
+    const fxR = s.currency === 'USD' ? fx : 1;
+    return { symbol: s.symbol, val: p * s.shares * fxR };
+  });
+  const total = vals.reduce((a, b) => a + b.val, 0) || 1;
+  const w = {};
+  vals.forEach(v => { w[v.symbol] = v.val / total * 100; });
+  return { weights: w, total };
+}
+
+// 매크로 섹터 영향 점수 (0~1)
+function macroScoreForSector(sector) {
+  const sens = MACRO_SENSITIVITY[sector] || { rates:0, inflation:0, oil:0, dollar:0 };
+  const impact = (
+    sens.rates     * macroRegime.rates +
+    sens.inflation * macroRegime.inflation +
+    sens.oil       * macroRegime.oil +
+    sens.dollar    * macroRegime.dollar
+  ) / 4;
+  return (impact + 1) / 2; // 0~1
+}
+
+// 분석 카드 렌더링
+function renderAllocAnalysis(budget) {
+  const el = document.getElementById('alloc-analysis');
+  if (!el || !portfolio.length) { if(el) el.innerHTML=''; return; }
+
+  const fx = usdKrw || 1450;
+  const { weights } = calcPortfolioWeights();
+  const idealPct   = 100 / portfolio.length;
+
+  // ── 카드 1: 리밸런싱 현황 ──
+  const rebalList = portfolio.map(s => {
+    const cur = weights[s.symbol] || 0;
+    const diff = cur - idealPct;
+    return { name: s.name, sym: s.symbol, diff };
+  }).sort((a, b) => a.diff - b.diff);
+  const underList = rebalList.filter(x => x.diff < -1).slice(0, 3);
+  const overList  = rebalList.filter(x => x.diff >  1).slice(0, 3);
+
+  const rebalRows = [
+    ...underList.map(x => `<div class="alloc-ac-row">
+      <span class="alloc-ac-row-label">${x.name}</span>
+      <span class="alloc-tag buy">매수 적합 ${x.diff.toFixed(1)}%</span>
+    </div>`),
+    ...overList.map(x => `<div class="alloc-ac-row">
+      <span class="alloc-ac-row-label">${x.name}</span>
+      <span class="alloc-tag over">비중 과다 +${x.diff.toFixed(1)}%</span>
+    </div>`),
+  ].slice(0, 4).join('') || `<div style="font-size:12px;color:var(--muted);padding-top:4px">균형 잡힌 포트폴리오</div>`;
+
+  // ── 카드 2: 섹터 배분 (이번 달 배분 후) ──
+  const sectorMap = {};
+  let totalBudgetAlloc = 0;
+  portfolio.forEach(s => {
+    const pct    = allocPct[s.symbol] || 0;
+    const amount = budget * pct / 100;
+    const sec    = s.sector || '기타';
+    sectorMap[sec] = (sectorMap[sec] || 0) + amount;
+    totalBudgetAlloc += amount;
+  });
+  const topSectors = Object.entries(sectorMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([sec, amt]) => {
+      const secShort = sec.replace('ETF — ','ETF·').replace('Information Technology','IT·반도체')
+        .replace('Consumer Discretionary','경기소비재').replace('Consumer Staples','필수소비재')
+        .replace('Communication Services','커뮤니케이션').replace('Real Estate','리츠')
+        .replace('Financials','금융').replace('Health Care','헬스케어');
+      const p = totalBudgetAlloc > 0 ? Math.round(amt / totalBudgetAlloc * 100) : 0;
+      return `<div class="alloc-ac-row">
+        <span class="alloc-ac-row-label">${secShort}</span>
+        <span class="alloc-ac-row-val" style="color:var(--accent2)">${p}%</span>
+      </div>`;
+    }).join('') || `<div style="font-size:12px;color:var(--muted);padding-top:4px">배분 정보 없음</div>`;
+
+  // ── 카드 3: 예상 배당 수익 ──
+  let annualDiv = 0;
+  portfolio.forEach(s => {
+    if (!s.dividend) return;
+    const pct    = allocPct[s.symbol] || 0;
+    const amount = budget * pct / 100; // KRW
+    const price  = prices[s.symbol]?.price || s.avgPrice;
+    const fxR    = s.currency === 'USD' ? fx : 1;
+    const sharesBought = price > 0 ? amount / (price * fxR) : 0;
+    const divPerShare  = s.currency === 'USD' ? s.dividend * fx : s.dividend;
+    annualDiv += sharesBought * divPerShare;
+  });
+  const monthlyDiv = Math.round(annualDiv / 12);
+  const divColor   = annualDiv > 0 ? 'var(--green)' : 'var(--muted)';
+
+  // ── 매크로 우호 섹터 TOP 1 ──
+  const macroTop = Object.entries(
+    portfolio.reduce((acc, s) => {
+      const sec = s.sector;
+      if (!acc[sec]) acc[sec] = macroScoreForSector(sec);
+      return acc;
+    }, {})
+  ).sort((a, b) => b[1] - a[1])[0];
+  const macroHint = macroTop && macroTop[1] > 0.55
+    ? `<div style="margin-top:10px;padding:8px 10px;background:rgba(124,106,255,.1);border-radius:8px;font-size:11px;color:var(--accent2)">
+        📡 매크로 수혜 섹터<br><strong>${macroTop[0].replace('Information Technology','IT·반도체').replace('ETF — Broad Market','ETF(시장전체)')}</strong>
+      </div>`
+    : '';
+
+  el.innerHTML = `
+    <div class="alloc-ac">
+      <div class="alloc-ac-title">⚖️ 리밸런싱 현황</div>
+      ${rebalRows}
+    </div>
+    <div class="alloc-ac">
+      <div class="alloc-ac-title">🏢 이번 달 섹터 배분</div>
+      ${topSectors}
+    </div>
+    <div class="alloc-ac">
+      <div class="alloc-ac-title">💰 예상 배당 수익</div>
+      <div class="alloc-ac-big" style="color:${divColor}">₩${monthlyDiv.toLocaleString('ko')}</div>
+      <div class="alloc-ac-sub">월 예상  ·  연 ₩${Math.round(annualDiv).toLocaleString('ko')}</div>
+      ${macroHint}
+    </div>`;
+}
+
 function renderAlloc() {
   const budget = parseInt(document.getElementById('budget-input').value) || 400000;
   document.getElementById('budget-display').textContent = budget.toLocaleString('ko');
 
   if (!portfolio.length) return;
 
+  const fx = usdKrw || 1450;
+  const { weights } = calcPortfolioWeights();
+  const idealPct = 100 / portfolio.length;
+
   let html = '';
   let totalSpend = 0;
 
   for (const s of portfolio) {
-    const pct = allocPct[s.symbol] || 0;
+    const pct    = allocPct[s.symbol] || 0;
     const amount = Math.floor(budget * pct / 100);
-    const cur = prices[s.symbol]?.price;
-    const shares = cur ? (amount / cur).toFixed(2) : '—';
-    totalSpend += amount;
+    const cur    = prices[s.symbol]?.price;
+    const fxR    = s.currency === 'USD' ? fx : 1;
+    const shares = cur ? (amount / (cur * fxR)).toFixed(3) : '—';
+    totalSpend  += amount;
+
+    // 현재가 / 수익률
+    const retPct    = cur && s.avgPrice > 0 ? (cur - s.avgPrice) / s.avgPrice * 100 : null;
+    const retStr    = retPct !== null
+      ? `<span style="color:${retPct>=0?'var(--green)':'var(--red)'}">${retPct>=0?'+':''}${retPct.toFixed(1)}%</span>`
+      : '';
+    const priceStr  = cur
+      ? `<span style="color:var(--muted)">${s.currency==='KRW'?'₩':'$'}${cur.toLocaleString(undefined,{maximumFractionDigits:2})}</span>`
+      : '';
+
+    // 달러 금액 표기 (USD 종목)
+    const usdAmt = s.currency === 'USD' && fx
+      ? `<span style="color:var(--muted)">$${(amount/fx).toFixed(0)}</span>`
+      : '';
+
+    // 리밸런싱 태그
+    const curW   = weights[s.symbol] || 0;
+    const diff   = curW - idealPct;
+    let tag = '';
+    if      (diff < -2) tag = `<span class="alloc-tag buy">매수 적합</span>`;
+    else if (diff >  2) tag = `<span class="alloc-tag over">비중 과다</span>`;
+    else                tag = `<span class="alloc-tag ok">적정</span>`;
 
     html += `<div class="alloc-item">
-      <div>
-        <div class="alloc-symbol">${s.symbol}</div>
-        <div style="font-size:11px;color:var(--muted)">${s.name}</div>
+      <div style="min-width:80px">
+        <div class="alloc-symbol">${s.symbol.replace('.KS','')}</div>
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px">${s.name}</div>
       </div>
       <div class="alloc-bar-wrap">
-        <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted)">
-          <span>${s.currency==='KRW'?'₩':'$'}${amount.toLocaleString()}</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
+          <span style="font-weight:600">₩${amount.toLocaleString('ko')}</span>
           <span class="alloc-shares">${shares}주 예상</span>
         </div>
-        <div class="alloc-bar-track"><div class="alloc-bar-fill" style="width:${pct}%"></div></div>
+        <div class="alloc-bar-track"><div class="alloc-bar-fill" style="width:${Math.min(pct,100)}%"></div></div>
+        <div class="alloc-item-meta">${priceStr}${retStr}${usdAmt}${tag}</div>
       </div>
       <div>
         <input class="pct-input" type="number" value="${pct}" min="0" max="100"
@@ -1787,13 +1965,55 @@ function renderAlloc() {
   document.getElementById('alloc-sum').textContent = '₩' + totalSpend.toLocaleString('ko');
   document.getElementById('alloc-budget-label').textContent = '₩' + budget.toLocaleString('ko');
   const remain = budget - totalSpend;
-  const remEl = document.getElementById('alloc-remain');
+  const remEl  = document.getElementById('alloc-remain');
   remEl.textContent = remain !== 0 ? `(잔여 ${remain>=0?'+':''}${remain.toLocaleString()}원)` : '';
   remEl.style.color = remain === 0 ? 'var(--green)' : 'var(--yellow)';
+
+  renderAllocAnalysis(budget);
 }
 
 function updateAlloc(symbol, val) {
   allocPct[symbol] = Math.max(0, Math.min(100, parseInt(val)||0));
+  renderAlloc();
+}
+
+// 스마트 배분 제안
+function smartAlloc() {
+  if (!portfolio.length) return;
+  const fx = usdKrw || 1450;
+  const { weights } = calcPortfolioWeights();
+  const idealPct = 100 / portfolio.length;
+
+  const scores = portfolio.map(s => {
+    const cur      = prices[s.symbol]?.price || s.avgPrice;
+    const retPct   = s.avgPrice > 0 ? (cur - s.avgPrice) / s.avgPrice * 100 : 0;
+    const curW     = weights[s.symbol] || 0;
+
+    // 1. 리밸런싱 필요도 (비중 부족할수록 높음)
+    const rebalScore = Math.max(0, (idealPct - curW) / idealPct);
+
+    // 2. 매크로 우호도 (섹터 기반)
+    const macroScore = macroScoreForSector(s.sector || '');
+
+    // 3. 저점 매수 기회 (수익률 낮을수록 높음, 최대 -30%까지)
+    const dipScore = Math.max(0, Math.min(1, -retPct / 30));
+
+    const total = rebalScore * 0.5 + macroScore * 0.3 + dipScore * 0.2;
+    return { symbol: s.symbol, score: Math.max(0.01, total) };
+  });
+
+  const sumScore = scores.reduce((a, b) => a + b.score, 0) || 1;
+  scores.forEach(x => {
+    allocPct[x.symbol] = Math.round(x.score / sumScore * 100);
+  });
+
+  // 반올림 오차 보정 (합계 = 100)
+  const diff = 100 - scores.reduce((a, x) => a + allocPct[x.symbol], 0);
+  if (diff !== 0) {
+    const topSym = scores.sort((a, b) => b.score - a.score)[0].symbol;
+    allocPct[topSym] = (allocPct[topSym] || 0) + diff;
+  }
+
   renderAlloc();
 }
 
