@@ -101,6 +101,10 @@
     .sum-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;}
     .sum-card .label{font-size:11px;color:var(--muted);margin-bottom:6px;}
     .sum-card .value{font-size:20px;font-weight:700;letter-spacing:-.02em;}
+    .maskable{transition:filter .25s;}
+    .amounts-hidden .maskable{filter:blur(10px);user-select:none;pointer-events:none;}
+    .toggle-amounts-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:5px 12px;cursor:pointer;font-family:inherit;transition:all .2s;display:flex;align-items:center;gap:5px;}
+    .toggle-amounts-btn:hover{border-color:rgba(124,106,255,.4);color:var(--accent2);}
 
     /* ── 뉴스 ── */
     .news-item{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:10px;transition:border-color .2s;}
@@ -155,15 +159,16 @@
     .budget-field{width:140px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:16px;font-family:inherit;text-align:center;outline:none;}
     .budget-field:focus{border-color:rgba(124,106,255,.5);}
 
-    .alloc-item{display:flex;align-items:center;gap:14px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:8px;}
-    .alloc-symbol{font-weight:700;color:var(--accent2);font-size:14px;min-width:70px;}
-    .alloc-bar-wrap{flex:1;}
-    .alloc-bar-track{height:6px;background:rgba(255,255,255,.06);border-radius:100px;overflow:hidden;margin-top:4px;}
+    .alloc-item{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:5px;}
+    .alloc-item:last-child{margin-bottom:0;}
+    .alloc-symbol{font-weight:700;color:var(--accent2);font-size:13px;min-width:70px;}
+    .alloc-bar-wrap{flex:1;min-width:0;}
+    .alloc-bar-track{height:3px;background:rgba(255,255,255,.06);border-radius:100px;overflow:hidden;margin-top:3px;}
     .alloc-bar-fill{height:100%;border-radius:100px;background:var(--accent);transition:width .5s ease;}
     .alloc-pct{font-size:13px;color:var(--muted);min-width:36px;text-align:right;}
     .alloc-amount{font-size:14px;font-weight:600;color:var(--text);min-width:80px;text-align:right;}
-    .alloc-shares{font-size:11px;color:var(--muted);}
-    .pct-input{width:56px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:13px;text-align:center;font-family:inherit;outline:none;}
+    .alloc-shares{font-size:10px;color:var(--muted);}
+    .pct-input{width:46px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:3px 6px;color:var(--text);font-size:12px;text-align:center;font-family:inherit;outline:none;}
     .pct-input:focus{border-color:rgba(124,106,255,.5);}
 
     /* ── 월 배분 분석 ── */
@@ -500,9 +505,14 @@
   <div id="api-warn-port"></div>
 
   <!-- 요약 -->
-  <div class="summary-grid">
-    <div class="sum-card"><div class="label">총 평가금액</div><div class="value" id="s-total">—</div></div>
-    <div class="sum-card"><div class="label">총 손익</div><div class="value" id="s-pnl">—</div></div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+    <button class="toggle-amounts-btn" id="amounts-toggle-btn" onclick="toggleAmounts()">
+      <span id="amounts-toggle-icon">👁</span><span id="amounts-toggle-label">금액 보기</span>
+    </button>
+  </div>
+  <div class="summary-grid amounts-hidden" id="summary-grid">
+    <div class="sum-card"><div class="label">총 평가금액</div><div class="value maskable" id="s-total">—</div></div>
+    <div class="sum-card"><div class="label">총 손익</div><div class="value maskable" id="s-pnl">—</div></div>
     <div class="sum-card"><div class="label">수익률</div><div class="value" id="s-rate">—</div></div>
     <div class="sum-card"><div class="label">연간 배당</div><div class="value" id="s-div">—</div></div>
   </div>
@@ -680,13 +690,25 @@
     </div>
   </div>
 
-  <!-- 이달 추천 종목 -->
-  <div class="card" id="alloc-rec-wrap" style="display:none;">
+  <!-- 이달 추천 종목 + 직접 추가 -->
+  <div class="card" id="alloc-rec-wrap">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <div class="card-title" style="margin:0">💡 이런 종목은 어떠세요?</div>
       <span style="font-size:11px;color:var(--muted)">매크로 기반 추천 · 미보유 종목</span>
     </div>
     <div id="alloc-rec"></div>
+    <!-- 직접 티커 추가 -->
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">직접 티커 추가</div>
+      <div style="display:flex;gap:8px;">
+        <input id="custom-ticker-input" class="form-input" type="text"
+          placeholder="예: MSFT  또는  035420.KS"
+          style="flex:1;padding:9px 12px;font-size:13px;"
+          onkeydown="if(event.key==='Enter') addCustomTicker()"/>
+        <button onclick="addCustomTicker()" class="add-stock-btn" style="height:auto;padding:9px 18px;font-size:13px;">추가</button>
+      </div>
+      <div id="custom-ticker-msg" style="font-size:11px;margin-top:6px;min-height:16px;"></div>
+    </div>
   </div>
 </div>
 
@@ -797,6 +819,26 @@ let allocPct = {};
 let allocExcluded = new Set(JSON.parse(localStorage.getItem('alloc_excluded') || '[]'));
 let allocExtra = []; // 이번 세션 추가 추천 종목
 let usdKrw = null; // 실시간 환율
+let amountsVisible = JSON.parse(localStorage.getItem('amounts_visible') || 'false');
+
+// ── 금액 가리기/보이기 ──────────────────────────────────────
+function toggleAmounts() {
+  amountsVisible = !amountsVisible;
+  localStorage.setItem('amounts_visible', JSON.stringify(amountsVisible));
+  applyAmountsVisibility();
+}
+function applyAmountsVisibility() {
+  const grid = document.getElementById('summary-grid');
+  const lbl  = document.getElementById('amounts-toggle-label');
+  if (!grid) return;
+  if (amountsVisible) {
+    grid.classList.remove('amounts-hidden');
+    if (lbl) lbl.textContent = '금액 숨기기';
+  } else {
+    grid.classList.add('amounts-hidden');
+    if (lbl) lbl.textContent = '금액 보기';
+  }
+}
 
 // ── 이달 추천 종목 (포트폴리오 미보유 기준) ──────────────────
 const RECOMMENDED_STOCKS = [
@@ -1948,6 +1990,35 @@ function toggleAllocExclude(symbol) {
   renderAlloc();
 }
 
+// 직접 티커 추가
+function addCustomTicker() {
+  const input = document.getElementById('custom-ticker-input');
+  const msg   = document.getElementById('custom-ticker-msg');
+  const sym   = input.value.trim().toUpperCase();
+  if (!sym) return;
+
+  if (portfolio.some(s => s.symbol === sym) || allocExtra.some(s => s.symbol === sym)) {
+    if (msg) { msg.textContent = '이미 포함된 종목입니다.'; msg.style.color = 'var(--yellow)'; }
+    return;
+  }
+  const isKR = sym.endsWith('.KS');
+  allocExtra.push({
+    symbol:   sym,
+    name:     isKR ? sym.replace('.KS', '') : sym,
+    currency: isKR ? 'KRW' : 'USD',
+    avgPrice: 0,
+    dividend: 0,
+    type:     '성장',
+    sector:   'Information Technology',
+    addedAt:  Date.now(),
+  });
+  allocPct[sym] = 5;
+  input.value   = '';
+  if (msg) { msg.textContent = `${sym} 추가됨 · 비율 직접 조정해 주세요`; msg.style.color = 'var(--green)'; }
+  setTimeout(() => { if (msg) msg.textContent = ''; }, 3000);
+  renderAlloc();
+}
+
 // 추천 종목 이번 달 배분에 추가
 function addRecToAlloc(symbol) {
   if (allocExtra.some(s => s.symbol === symbol)) return;
@@ -2029,22 +2100,24 @@ function renderAlloc() {
       : `<button class="alloc-exclude-btn" onclick="toggleAllocExclude('${s.symbol}')" title="이번 달 제외">×</button>`;
 
     html += `<div class="alloc-item">
-      <div style="min-width:84px;flex-shrink:0">
-        <div class="alloc-symbol" style="font-size:${isKR?'12px':'14px'}">${symMain}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:1px">${symSub}</div>
+      <div style="min-width:78px;flex-shrink:0;overflow:hidden;">
+        <div class="alloc-symbol" style="font-size:${isKR?'11px':'13px'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${symMain}</div>
+        <div style="font-size:10px;color:var(--muted);white-space:nowrap">${symSub}</div>
       </div>
       <div class="alloc-bar-wrap">
-        <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
-          <span style="font-weight:600">₩${amount.toLocaleString('ko')}</span>
-          <span class="alloc-shares">${shares}주 예상</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;line-height:1.2;">
+          <span style="font-weight:600;color:var(--text)">₩${amount.toLocaleString('ko')}</span>
+          <span class="alloc-shares">${shares}주${usdAmt ? '  '+usdAmt : ''}</span>
         </div>
         <div class="alloc-bar-track"><div class="alloc-bar-fill" style="width:${Math.min(pct,100)}%"></div></div>
-        <div class="alloc-item-meta">${priceStr}${retStr}${usdAmt}${tag}</div>
+        <div class="alloc-item-meta" style="gap:5px;margin-top:2px;">${priceStr}${retStr}${tag}</div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-        <input class="pct-input" type="number" value="${pct}" min="0" max="100"
-          onchange="updateAlloc('${s.symbol}', this.value)" />
-        <div style="font-size:10px;color:var(--muted);text-align:center">%</div>
+      <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
+          <input class="pct-input" type="number" value="${pct}" min="0" max="100"
+            onchange="updateAlloc('${s.symbol}', this.value)" />
+          <div style="font-size:9px;color:var(--muted)">%</div>
+        </div>
         ${excludeBtn}
       </div>
     </div>`;
@@ -3229,6 +3302,7 @@ window.onload = () => {
   });
 
   normalizeAlloc();
+  applyAmountsVisibility();
   renderPortfolio();
   renderAlloc();
   renderScore();
