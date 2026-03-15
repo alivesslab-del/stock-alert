@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>쑤기 — Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #111118;
+      --surface: #16161f;
+      --border: rgba(255,255,255,0.07);
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --accent: #7c6aff;
+      --accent2: #a78bfa;
+      --glow: rgba(124,106,255,0.15);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Noto Sans KR', sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* ── Noise texture overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 48px;
+      background: rgba(10,10,15,0.7);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .nav-logo span { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      gap: 36px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+      overflow: hidden;
+    }
+
+    .hero-glow {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(124,106,255,0.12) 0%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(124,106,255,0.1);
+      border: 1px solid rgba(124,106,255,0.25);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 12px;
+      color: var(--accent2);
+      margin-bottom: 28px;
+      letter-spacing: 0.05em;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .hero h1 {
+      font-size: clamp(48px, 8vw, 88px);
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 .name {
+      background: linear-gradient(135deg, #fff 0%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto 40px;
+      font-weight: 300;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 24px rgba(124,106,255,0.3);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent2);
+      box-shadow: 0 0 32px rgba(124,106,255,0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      color: var(--text);
+      border-color: rgba(255,255,255,0.15);
+      transform: translateY(-1px);
+    }
+
+    /* ── Sections ── */
+    section {
+      position: relative;
+      z-index: 1;
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 96px 24px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin-bottom: 48px;
+      color: var(--text);
+    }
+
+    /* ── About ── */
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 600px) { .about-grid { grid-template-columns: 1fr; } }
+
+    .about-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      transition: border-color 0.2s;
+    }
+
+    .about-card:hover { border-color: rgba(124,106,255,0.3); }
+
+    .about-card .icon {
+      font-size: 24px;
+      margin-bottom: 12px;
+    }
+
+    .about-card h3 {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .about-card p {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* ── Skills ── */
+    .skills-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .skill-tag {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: var(--muted);
+      transition: all 0.2s;
+    }
+
+    .skill-tag:hover {
+      border-color: rgba(124,106,255,0.4);
+      color: var(--accent2);
+      background: rgba(124,106,255,0.05);
+    }
+
+    /* ── Contact ── */
+    .contact-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 56px 48px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .contact-box::before {
+      content: '';
+      position: absolute;
+      top: -80px; left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(124,106,255,0.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .contact-box h2 {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin-bottom: 12px;
+    }
+
+    .contact-box p {
+      color: var(--muted);
+      margin-bottom: 32px;
+      font-size: 14px;
+    }
+
+    /* ── Projects ── */
+    .project-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px;
+      margin-bottom: 20px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .project-card:hover {
+      border-color: rgba(124,106,255,0.35);
+      transform: translateY(-2px);
+    }
+
+    .project-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .project-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: rgba(124,106,255,0.12);
+      border: 1px solid rgba(124,106,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .project-title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .project-desc {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.65;
+      margin-bottom: 24px;
+    }
+
+    .project-features {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .feature-item .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .project-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124,106,255,0.08);
+      border: 1px solid rgba(124,106,255,0.2);
+      border-radius: 100px;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: var(--accent2);
+      white-space: nowrap;
+    }
+
+    .project-status::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    /* ── Divider ── */
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: var(--border);
+      margin: 0 auto;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.03em;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-logo">쑤기<span>.</span></div>
+    <ul class="nav-links">
+      <li><a href="#about">About</a></li>
+      <li><a href="#skills">Skills</a></li>
+      <li><a href="#projects">Projects</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-glow"></div>
+    <div>
+      <div class="hero-badge">안녕하세요, 반갑습니다</div>
+      <h1>저는 <span class="name">쑤기</span>입니다</h1>
+      <p>새로운 것을 배우고 만드는 것을 좋아하는 사람입니다.</p>
+      <div class="hero-actions">
+        <a href="#about" class="btn btn-primary">더 알아보기 →</a>
+        <a href="#contact" class="btn btn-ghost">연락하기</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- About -->
+  <section id="about">
+    <div class="section-label">About</div>
+    <h2 class="section-title">저에 대해서</h2>
+    <div class="about-grid">
+      <div class="about-card">
+        <div class="icon">🌱</div>
+        <h3>성장 중</h3>
+        <p>매일 새로운 것을 배우며 성장하고 있습니다. 도전을 두려워하지 않고 끊임없이 발전하려 합니다.</p>
+      </div>
+      <div class="about-card">
+        <div class="icon">💡</div>
+        <h3>아이디어</h3>
+        <p>창의적인 생각을 현실로 만드는 것을 좋아합니다. 문제를 다양한 시각으로 바라봅니다.</p>
+      </div>
+      <div class="about-card">
+        <div class="icon">🤝</div>
+        <h3>협업</h3>
+        <p>함께할 때 더 좋은 결과가 나온다고 믿습니다. 소통을 중요하게 생각합니다.</p>
+      </div>
+      <div class="about-card">
+        <div class="icon">🎯</div>
+        <h3>목표 지향</h3>
+        <p>명확한 목표를 세우고 꾸준히 나아갑니다. 작은 것부터 차근차근 실행합니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Skills -->
+  <section id="skills">
+    <div class="section-label">Skills</div>
+    <h2 class="section-title">관심사 & 스킬</h2>
+    <div class="skills-list">
+      <span class="skill-tag">Claude Code</span>
+      <span class="skill-tag">AI 활용</span>
+      <span class="skill-tag">문제 해결</span>
+      <span class="skill-tag">기획</span>
+      <span class="skill-tag">아이디어 발굴</span>
+      <span class="skill-tag">학습</span>
+      <span class="skill-tag">커뮤니케이션</span>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Projects -->
+  <section id="projects">
+    <div class="section-label">Projects</div>
+    <h2 class="section-title">작업물</h2>
+
+    <div class="project-card">
+      <div class="project-header">
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div class="project-icon">💪</div>
+          <div>
+            <div class="project-title">체력 관리 프로그램</div>
+            <div style="font-size:12px;color:var(--muted);">Health Management App</div>
+          </div>
+        </div>
+        <div class="project-status">진행 중</div>
+      </div>
+      <p class="project-desc">
+        식단 분석, 운동 기록, 체중 변화를 하나의 앱으로 관리합니다.
+        매일 로그를 작성하고 AI가 데이터를 분석해 맞춤형 인사이트를 제공합니다.
+      </p>
+      <div class="project-features">
+        <a href="diet.html" class="feature-item" style="text-decoration:none;cursor:pointer;border-color:rgba(124,106,255,0.25);"><span class="dot"></span>식단 분석 →</a>
+        <div class="feature-item"><span class="dot" style="background:var(--muted)"></span>운동 기록 <span style="font-size:10px;opacity:0.5;">준비 중</span></div>
+        <div class="feature-item"><span class="dot" style="background:var(--muted)"></span>체중 그래프 <span style="font-size:10px;opacity:0.5;">준비 중</span></div>
+        <div class="feature-item"><span class="dot" style="background:var(--muted)"></span>일일 로그 <span style="font-size:10px;opacity:0.5;">준비 중</span></div>
+        <div class="feature-item"><span class="dot" style="background:var(--muted)"></span>AI 분석 <span style="font-size:10px;opacity:0.5;">준비 중</span></div>
+      </div>
+    </div>
+    <!-- 주식 포트폴리오 트래커 -->
+    <div class="project-card">
+      <div class="project-header">
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div class="project-icon">📈</div>
+          <div>
+            <div class="project-title">주식 포트폴리오 트래커</div>
+            <div style="font-size:12px;color:var(--muted);">Stock Portfolio Tracker</div>
+          </div>
+        </div>
+        <div class="project-status">진행 중</div>
+      </div>
+      <p class="project-desc">
+        한국·미국 주식을 한 곳에서 관리합니다.
+        월 40만원 분산투자 플랜, 뉴스 분석, 종합 점수까지 제공합니다.
+      </p>
+      <div class="project-features">
+        <a href="stock.html" class="feature-item" style="text-decoration:none;cursor:pointer;border-color:rgba(124,106,255,.25);"><span class="dot"></span>포트폴리오 →</a>
+        <div class="feature-item"><span class="dot"></span>뉴스 & 분석</div>
+        <div class="feature-item"><span class="dot"></span>월 배분 플랜</div>
+        <div class="feature-item"><span class="dot"></span>종합 점수</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Contact -->
+  <section id="contact">
+    <div class="contact-box">
+      <h2>함께 해요 👋</h2>
+      <p>궁금한 것이 있거나 함께 하고 싶은 일이 있으시면 언제든지 연락주세요.</p>
+      <a href="mailto:hello@example.com" class="btn btn-primary">이메일 보내기 →</a>
+    </div>
+  </section>
+
+  <footer>
+    © 2026 쑤기 · Made with Claude Code
+  </footer>
+
+</body>
+</html>

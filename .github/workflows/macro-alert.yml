@@ -1,0 +1,25 @@
+name: 🚨 Macro Alert (30분 간격)
+
+on:
+  schedule:
+    - cron: '0,30 0-9 * * 1-5'    # 월~금 09:00~18:30 KST (UTC 0~9시 매 30분)
+  workflow_dispatch:
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 패키지 설치
+        run: pip install requests yfinance pytz
+
+      - name: Macro Alert 체크
+        run: python telegram_report.py alert
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT:  ${{ secrets.TG_CHAT }}

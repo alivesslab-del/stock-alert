@@ -1,0 +1,25 @@
+name: 📈 Pre-US Report (15:00 KST)
+
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'    # 월~금 06:00 UTC = 월~금 15:00 KST
+  workflow_dispatch:           # 수동 실행 버튼
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 패키지 설치
+        run: pip install requests yfinance pytz
+
+      - name: Pre-US Report 전송
+        run: python telegram_report.py preus
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT:  ${{ secrets.TG_CHAT }}
