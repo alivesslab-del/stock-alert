@@ -438,6 +438,60 @@
       font-size: 12px;
       letter-spacing: 0.03em;
     }
+
+    /* ── 햄버거 버튼 ── */
+    .nav-hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 4px;
+      background: none;
+      border: none;
+    }
+    .nav-hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--muted);
+      border-radius: 2px;
+      transition: all 0.3s;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      nav {
+        padding: 16px 20px;
+        position: fixed;
+      }
+      .nav-hamburger { display: flex; }
+      .nav-links {
+        display: none;
+        position: fixed;
+        top: 61px; left: 0; right: 0;
+        background: rgba(10,10,15,0.97);
+        flex-direction: column;
+        gap: 0;
+        border-bottom: 1px solid var(--border);
+        padding: 8px 0;
+        backdrop-filter: blur(20px);
+        z-index: 99;
+      }
+      .nav-links.open { display: flex; }
+      .nav-links li a {
+        display: block;
+        padding: 14px 24px;
+        font-size: 14px;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+      .hero { padding: 100px 20px 60px; }
+      .hero p { font-size: 15px; }
+      section { padding: 60px 20px; }
+      .contact-box { padding: 36px 20px; }
+      .project-card { padding: 24px 20px; }
+      .project-features { grid-template-columns: 1fr 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -445,12 +499,15 @@
   <!-- Nav -->
   <nav>
     <div class="nav-logo">쑤기<span>.</span></div>
-    <ul class="nav-links">
-      <li><a href="#about">About</a></li>
-      <li><a href="#skills">Skills</a></li>
-      <li><a href="#projects">Projects</a></li>
-      <li><a href="#contact">Contact</a></li>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="#about" onclick="closeNav()">About</a></li>
+      <li><a href="#skills" onclick="closeNav()">Skills</a></li>
+      <li><a href="#projects" onclick="closeNav()">Projects</a></li>
+      <li><a href="#contact" onclick="closeNav()">Contact</a></li>
     </ul>
+    <button class="nav-hamburger" id="nav-hamburger" onclick="toggleNav()" aria-label="메뉴">
+      <span></span><span></span><span></span>
+    </button>
   </nav>
 
   <!-- Hero -->
@@ -584,5 +641,13 @@
     © 2026 쑤기 · Made with Claude Code
   </footer>
 
+  <script>
+    function toggleNav() {
+      document.getElementById('nav-links').classList.toggle('open');
+    }
+    function closeNav() {
+      document.getElementById('nav-links').classList.remove('open');
+    }
+  </script>
 </body>
 </html>

@@ -419,6 +419,64 @@
     @keyframes spin{to{transform:rotate(360deg);}}
     .empty{text-align:center;color:var(--muted);font-size:13px;padding:40px;line-height:2;}
     .api-warn{background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--yellow);margin-bottom:16px;}
+
+    /* ── Mobile ── */
+    @media(max-width:640px) {
+      /* 헤더 */
+      header { padding:12px 16px; gap:8px; flex-wrap:nowrap; overflow:hidden; }
+      .header-title { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .header-right { gap:6px; flex-shrink:0; }
+      #fx-rate, #last-updated { display:none; }
+      #tg-morning-btn, #tg-preus-btn { display:none; }
+      .icon-btn { font-size:11px; padding:5px 10px; }
+      .back-btn { white-space:nowrap; font-size:12px; }
+
+      /* 탭 가로 스크롤 */
+      .tabs {
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+        gap: 2px; padding: 10px 16px 0;
+        white-space: nowrap; scrollbar-width: none;
+      }
+      .tabs::-webkit-scrollbar { display: none; }
+      .tab { padding: 8px 14px; font-size: 12px; white-space: nowrap; }
+
+      /* 탭 콘텐츠 */
+      .tab-content { padding: 20px 14px; }
+      .card { padding: 18px 14px; }
+
+      /* 요약 카드 */
+      .summary-grid { grid-template-columns: repeat(2,1fr); gap: 10px; }
+      .sum-card .value { font-size: 16px; }
+
+      /* 종목 추가 폼 */
+      .add-form { grid-template-columns: 1fr 1fr; }
+
+      /* 포트폴리오 테이블 가로 스크롤 */
+      #portfolio-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .portfolio-table { min-width: 560px; }
+      .portfolio-table th,
+      .portfolio-table td { padding: 10px 10px; font-size: 12px; }
+
+      /* 섹터 */
+      .sector-stats { grid-template-columns: repeat(2,1fr); gap: 10px; }
+      .sent-overview { grid-template-columns: repeat(3,1fr); gap: 8px; }
+      .sent-card-val { font-size: 24px; }
+      .score-summary { grid-template-columns: 1fr; text-align: center; }
+      .score-grid { grid-template-columns: 1fr; }
+
+      /* 월 배분 */
+      .budget-num { font-size: 32px; }
+      .alloc-analysis-grid { grid-template-columns: 1fr; }
+
+      /* 안내 카드 */
+      .guide-card { padding: 20px 16px; }
+
+      /* 헤더 우측 종목 추가 버튼 */
+      .add-stock-btn { font-size:11px; padding:5px 12px; height:30px; }
+
+      /* 한/미 비율바 */
+      #us-val, #kr-val { display: none; }
+    }
   </style>
 </head>
 <body>

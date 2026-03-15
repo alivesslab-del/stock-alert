@@ -176,6 +176,23 @@
     .action-btn:hover { border-color:rgba(124,106,255,.4); color:var(--accent2); }
 
     .empty-hint { text-align:center; color:var(--muted); font-size:13px; padding:28px 0; line-height:2; }
+
+    /* ── Mobile ── */
+    @media(max-width:480px) {
+      header { padding: 12px 16px; gap: 10px; flex-wrap: wrap; }
+      .header-title { font-size: 13px; }
+      .header-date { display: none; }
+      .header-right { gap: 8px; }
+      .settings-btn { font-size: 11px; padding: 5px 10px; }
+      .container { padding: 20px 14px; }
+      .card { padding: 18px 14px; }
+      .meal-textarea { min-height: 160px; font-size: 13px; }
+      .food-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+      .food-row-macros { flex-wrap: wrap; gap: 8px; }
+      .goal-row { font-size: 12px; }
+      .goal-input { width: 60px; }
+      .sum-total .num { font-size: 42px; }
+    }
   </style>
 </head>
 <body>
