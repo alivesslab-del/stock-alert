@@ -12,8 +12,8 @@ from xml.etree import ElementTree as ET
 import yfinance as yf
 
 # ── 설정 ────────────────────────────────────────────────────
-TG_TOKEN = os.environ.get('TG_TOKEN', '')
-TG_CHAT  = os.environ.get('TG_CHAT',  '')
+TG_TOKEN = os.environ.get('TG_TOKEN', '8688545690:AAG5fmkR6SWE3z5e9RBd5sKxCyW3knx5stw')
+TG_CHAT  = os.environ.get('TG_CHAT',  '8250645779')
 KST      = pytz.timezone('Asia/Seoul')
 
 # ── 포트폴리오 (stock.html의 DEFAULT_PORTFOLIO와 동일하게 유지) ──
@@ -95,23 +95,25 @@ def send_telegram(text):
 # ── 가격 조회 ────────────────────────────────────────────────
 def fetch_prices():
     symbols = [s['symbol'] for s in PORTFOLIO] + ['069500.KS', '229200.KS', 'USDKRW=X']
+    syms    = list(set(symbols))
     try:
-        data = yf.download(list(set(symbols)), period='5d', auto_adjust=True, progress=False)
-        closes = data['Close']
+        # group_by='ticker' → data[SYM]['Close'] 형태 (최신 yfinance 호환)
+        data = yf.download(syms, period='5d', auto_adjust=True, progress=False, group_by='ticker')
         result = {}
-        for sym in symbols:
+        for sym in syms:
             try:
-                col = closes[sym] if sym in closes.columns else None
-                if col is None:
-                    continue
-                vals = col.dropna()
-                if len(vals) >= 2:
-                    prev, curr = float(vals.iloc[-2]), float(vals.iloc[-1])
+                # 단일 종목이면 컬럼 레벨이 다름
+                if len(syms) == 1:
+                    col = data['Close'].dropna()
+                else:
+                    col = data[sym]['Close'].dropna()
+                if len(col) >= 2:
+                    prev, curr = float(col.iloc[-2]), float(col.iloc[-1])
                     result[sym] = {'price': curr, 'changePct': (curr - prev) / prev * 100 if prev else 0}
-                elif len(vals) == 1:
-                    result[sym] = {'price': float(vals.iloc[-1]), 'changePct': 0}
-            except Exception:
-                pass
+                elif len(col) == 1:
+                    result[sym] = {'price': float(col.iloc[-1]), 'changePct': 0}
+            except Exception as e:
+                print(f"  {sym} 처리 오류: {e}")
         return result
     except Exception as e:
         print(f"가격 조회 실패: {e}")
@@ -368,81 +370,118 @@ def preus_report():
 def macro_alert():
     """
     조건 기반 즉시 알림.
-    하루 중복 방지: GitHub Actions cache 없이 날짜+조건 키를 파일로 저장.
+    ① 보유 종목 ±5%
+    ② 매크로 지수 이상: VIX +15%, US10Y ±0.10%p, 유가(CL=F) ±3%, 달러(DX-Y.NYB) ±1%
+    하루 중복 방지: 날짜+조건 키를 파일로 저장.
     """
     import json, pathlib
 
     STATE_FILE = pathlib.Path('/tmp/macro_alert_state.json')
     today_str  = datetime.now(KST).strftime('%Y-%m-%d')
 
-    # 상태 로드 (당일 이미 발송된 알림 키 목록)
     if STATE_FILE.exists():
         state = json.loads(STATE_FILE.read_text())
     else:
         state = {}
-
     sent_today = set(state.get(today_str, []))
 
-    # ── 가격 조회 ──
-    alert_syms = ['NVDA', '^VIX', '^TNX']   # TNX = 미국 10년 국채 수익률 ×10
+    # ── 가격 조회: 포트폴리오 + 매크로 지수 ──
+    port_syms  = [s['symbol'] for s in PORTFOLIO]
+    macro_syms = ['^VIX', '^TNX', 'CL=F', 'DX-Y.NYB']
+    all_syms   = list(set(port_syms + macro_syms))
     try:
-        raw = yf.download(alert_syms, period='5d', auto_adjust=True, progress=False)
-        closes = raw['Close']
+        raw    = yf.download(all_syms, period='5d', auto_adjust=True, progress=False, group_by='ticker')
     except Exception as e:
         print(f"Alert 가격 조회 실패: {e}")
         return
 
-    def get_change(sym):
+    def _get_col(sym):
         try:
-            col  = closes[sym].dropna()
-            if len(col) < 2:
-                return None
-            prev, curr = float(col.iloc[-2]), float(col.iloc[-1])
-            return (curr - prev) / prev * 100 if prev else None
+            return raw[sym]['Close'].dropna() if len(all_syms) > 1 else raw['Close'].dropna()
         except Exception:
             return None
 
+    def get_pct(sym):
+        col = _get_col(sym)
+        if col is None or len(col) < 2:
+            return None
+        prev, curr = float(col.iloc[-2]), float(col.iloc[-1])
+        return (curr - prev) / prev * 100 if prev else None
+
+    def get_raw(sym):
+        col = _get_col(sym)
+        if col is None or len(col) < 2:
+            return None, None
+        return float(col.iloc[-2]), float(col.iloc[-1])
+
     alerts = []
 
-    # ── 조건 1: NVDA ±5% ──
-    nvda_chg = get_change('NVDA')
-    if nvda_chg is not None and abs(nvda_chg) >= 5.0:
-        key = f'NVDA_{today_str}'
-        if key not in sent_today:
-            direction = '급등' if nvda_chg > 0 else '급락'
-            impact    = 'AI 반도체 섹터 모멘텀 급등\n반도체 종목 변동성 확대 가능' if nvda_chg > 0 \
-                        else 'AI 반도체 섹터 하락 압력\n관련 종목 손절·비중 축소 검토'
-            alerts.append({
-                'key': key,
-                'msg': f"🚨 <b>Macro Alert</b>\n\nNVDA {fmt_ret(nvda_chg)} ({direction})\n\n{impact}",
-            })
+    # ── ① 보유 종목 ±5% ──
+    for s in PORTFOLIO:
+        chg = get_pct(s['symbol'])
+        if chg is None or abs(chg) < 5.0:
+            continue
+        key = f"STOCK_{s['symbol']}_{today_str}"
+        if key in sent_today:
+            continue
+        direction = '급등 🔺' if chg > 0 else '급락 🔻'
+        alerts.append({
+            'key': key,
+            'msg': (
+                f"🚨 <b>종목 알림</b>\n\n"
+                f"<b>{s['name']} ({s['symbol'].replace('.KS','')})</b> {fmt_ret(chg)} {direction}\n\n"
+                f"평균단가 대비 수익률: {fmt_ret((get_raw(s['symbol'])[1] or s['avg']) / s['avg'] * 100 - 100)}"
+            ),
+        })
 
-    # ── 조건 2: US10Y +0.10%p 이상 ──
-    # ^TNX 는 수익률×10 → 실제 변화량 = changePct/10 ×10 = changePct (basis points 개념)
-    # yfinance ^TNX 종가 단위: 퍼센트 × 10 → 실제 %p 변화 = (curr - prev) / 10
-    try:
-        tnx_col  = closes['^TNX'].dropna()
-        if len(tnx_col) >= 2:
-            tnx_prev, tnx_curr = float(tnx_col.iloc[-2]), float(tnx_col.iloc[-1])
-            tnx_chg_pp = (tnx_curr - tnx_prev) / 10   # %p 변화
-            if tnx_chg_pp >= 0.10:
-                key = f'US10Y_{today_str}'
-                if key not in sent_today:
-                    alerts.append({
-                        'key': key,
-                        'msg': f"🚨 <b>Macro Alert</b>\n\nUS10Y +{tnx_chg_pp:.2f}%p\n\n금리 상승 압력\n성장주 및 리츠 섹터 주의",
-                    })
-    except Exception:
-        pass
+    # ── ② 매크로 지수 이상 ──
 
-    # ── 조건 3: VIX +15% ──
-    vix_chg = get_change('^VIX')
+    # VIX +15% (공포지수 급등)
+    vix_chg = get_pct('^VIX')
     if vix_chg is not None and vix_chg >= 15.0:
         key = f'VIX_{today_str}'
         if key not in sent_today:
             alerts.append({
                 'key': key,
-                'msg': f"🚨 <b>Macro Alert</b>\n\nVIX {fmt_ret(vix_chg)}\n\n시장 공포 지수 상승\n리스크 자산 변동성 확대 가능",
+                'msg': f"🚨 <b>매크로 알림 — 공포지수</b>\n\nVIX {fmt_ret(vix_chg)}\n\n시장 공포 급등 · 리스크 자산 변동성 확대",
+            })
+
+    # US10Y ±0.10%p (금리 급변)
+    tnx_prev, tnx_curr = get_raw('^TNX')
+    if tnx_prev is not None and tnx_curr is not None:
+        tnx_chg_pp = (tnx_curr - tnx_prev) / 10   # yfinance TNX 단위: % × 10
+        if abs(tnx_chg_pp) >= 0.10:
+            key = f'US10Y_{today_str}'
+            if key not in sent_today:
+                direction = '상승 🔺' if tnx_chg_pp > 0 else '하락 🔻'
+                impact    = '성장주·리츠 섹터 주의' if tnx_chg_pp > 0 else '성장주·리츠 섹터 유리'
+                alerts.append({
+                    'key': key,
+                    'msg': f"🚨 <b>매크로 알림 — 미국 금리</b>\n\nUS10Y {tnx_chg_pp:+.2f}%p {direction}\n\n{impact}",
+                })
+
+    # 유가(WTI) ±3%
+    oil_chg = get_pct('CL=F')
+    if oil_chg is not None and abs(oil_chg) >= 3.0:
+        key = f'OIL_{today_str}'
+        if key not in sent_today:
+            direction = '급등 🔺' if oil_chg > 0 else '급락 🔻'
+            impact    = '운송·소비재 비용 압력 · 에너지 섹터 모니터링' if oil_chg > 0 else '소비재·운송 비용 감소 수혜'
+            alerts.append({
+                'key': key,
+                'msg': f"🚨 <b>매크로 알림 — 유가</b>\n\nWTI {fmt_ret(oil_chg)} {direction}\n\n{impact}",
+            })
+
+    # 달러인덱스(DXY) ±1%
+    dxy_chg = get_pct('DX-Y.NYB')
+    if dxy_chg is not None and abs(dxy_chg) >= 1.0:
+        key = f'DXY_{today_str}'
+        if key not in sent_today:
+            direction = '강세 🔺' if dxy_chg > 0 else '약세 🔻'
+            impact    = '다국적 기업 환차손 · 신흥국 자산 압박' if dxy_chg > 0 else '수출주 유리 · 원자재 가격 지지'
+            alerts.append({
+                'key': key,
+                'msg': f"🚨 <b>매크로 알림 — 달러</b>\n\nDXY {fmt_ret(dxy_chg)} {direction}\n\n{impact}",
             })
 
     # ── 전송 ──
@@ -460,7 +499,6 @@ def macro_alert():
         except Exception as e:
             print(f"Alert 전송 실패 ({a['key']}): {e}")
 
-    # ── 상태 저장 ──
     state[today_str] = list(sent_today | set(newly_sent))
     STATE_FILE.write_text(json.dumps(state))
 

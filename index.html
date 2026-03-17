@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>주식 트래커 — 체력관리</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -607,6 +608,32 @@
       .modal h2 { font-size:15px; }
       .modal p { font-size:11px; }
     }
+    /* ── 번역 버튼 ── */
+    .tr-btn{background:rgba(124,106,255,.1);border:1px solid rgba(124,106,255,.25);color:var(--accent2);cursor:pointer;font-size:10px;padding:2px 8px;border-radius:6px;font-family:inherit;flex-shrink:0;transition:all .2s;white-space:nowrap;line-height:1.5;}
+    .tr-btn:hover{background:rgba(124,106,255,.2);}
+    .tr-btn:disabled{opacity:.5;cursor:default;}
+    /* ── 종목 상세 모달 ── */
+    .sd-modal{position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(8px);z-index:500;display:none;align-items:center;justify-content:center;padding:24px;}
+    .sd-modal.open{display:flex;}
+    .sd-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;width:100%;max-width:500px;max-height:82vh;overflow-y:auto;}
+    .sd-news-item{padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+    .sd-news-item:last-child{border-bottom:none;}
+    .stock-clickable{cursor:pointer;border-bottom:1px dotted currentColor;transition:opacity .15s;}
+    .stock-clickable:hover{opacity:.8;}
+    /* ── 공통 유틸 ── */
+    .row{display:flex;align-items:center;}
+    .row-between{display:flex;align-items:center;justify-content:space-between;}
+    .col{display:flex;flex-direction:column;}
+    .t-muted{font-size:11px;color:var(--muted);}
+    .t-xs{font-size:10px;color:var(--muted);}
+    .t-sm{font-size:12px;}
+    .gap-6{gap:6px;}
+    .gap-8{gap:8px;}
+    .mb-6{margin-bottom:6px;}
+    .mb-10{margin-bottom:10px;}
+    .mb-12{margin-bottom:12px;}
+    .fw-6{font-weight:600;}
+    .fw-7{font-weight:700;}
   </style>
 </head>
 <body>
@@ -684,6 +711,11 @@
       <button class="modal-cancel" onclick="closeBuyModal()">취소</button>
     </div>
   </div>
+</div>
+
+<!-- 종목 뉴스 상세 모달 -->
+<div class="sd-modal" id="sd-modal" onclick="if(event.target===this)closeSD()">
+  <div class="sd-box" id="sd-box"></div>
 </div>
 
 <!-- Header -->
@@ -901,9 +933,9 @@
 
   <!-- 이달 추천 종목 + 직접 추가 -->
   <div class="card" id="alloc-rec-wrap">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div class="card-title" style="margin:0">💡 이런 종목은 어떠세요?</div>
-      <span style="font-size:11px;color:var(--muted)">매크로 기반 추천 · 미보유 종목</span>
+      <button onclick="refreshAllocRecs()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:5px 12px;cursor:pointer;font-family:inherit;transition:all .2s;" onmouseover="this.style.borderColor='rgba(124,106,255,.4)';this.style.color='var(--accent2)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">🔄 새로고침</button>
     </div>
     <div id="alloc-rec"></div>
     <!-- 직접 티커 추가 -->
@@ -969,7 +1001,8 @@
       <div class="guide-section" style="margin-bottom:0">
         <div class="guide-section-label">데이터 출처</div>
         <div class="guide-sources">
-          <div class="guide-source-chip"><div class="chip-dot" style="background:#60a5fa"></div>Alpha Vantage API — 미국 주식 실시간 가격</div>
+          <div class="guide-source-chip"><div class="chip-dot" style="background:#f59e0b"></div>Finnhub API — 미국 주식 실시간 가격 (분당 60회, 우선)</div>
+          <div class="guide-source-chip"><div class="chip-dot" style="background:#60a5fa"></div>Alpha Vantage API — 한국/미국 주식 가격 (Finnhub 폴백)</div>
           <div class="guide-source-chip"><div class="chip-dot" style="background:#34d399"></div>Yahoo Finance (yfinance) — 한국 주식 가격</div>
           <div class="guide-source-chip"><div class="chip-dot" style="background:#fb923c"></div>ExchangeRate-API — USD/KRW 실시간 환율</div>
         </div>
@@ -1008,24 +1041,30 @@
         <div class="guide-icon">📰</div>
         <div>
           <div class="guide-title">뉴스 & 분석</div>
-          <div class="guide-desc">보유 종목별 최신 뉴스 감정 분석 + 매크로 환경 모니터링</div>
+          <div class="guide-desc">보유 종목별 최신 뉴스 감정 분석 + 매크로 환경 모니터링 (미국·한국 주식 통합)</div>
         </div>
       </div>
       <div class="guide-section">
         <div class="guide-section-label">주요 기능</div>
         <div class="guide-points">
           <div class="guide-point"><div class="guide-point-dot"></div>종목별 뉴스 긍정 / 중립 / 부정 비율 자동 분류</div>
-          <div class="guide-point"><div class="guide-point-dot"></div>금리·인플레이션·유가·달러 4가지 매크로 지표 방향 분석</div>
+          <div class="guide-point"><div class="guide-point-dot"></div>금리·인플레이션·유가·달러 4가지 매크로 지표 방향 분석 + <strong>📋 투자 입장권 자동 판정</strong> (✅/❌ 2개 이상 = 공격 금지)</div>
           <div class="guide-point"><div class="guide-point-dot"></div>섹터별 뉴스 감정 집계 — 어떤 업종이 지금 주목받는지 확인</div>
           <div class="guide-point"><div class="guide-point-dot"></div>글로벌 시장 뉴스 타임라인</div>
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>📊 감정분석 카드 클릭</strong> — 긍정·중립·부정 카드를 클릭하면 해당 감정의 뉴스 목록과 관련 종목을 바로 확인</div>
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>🌐 영문 뉴스 번역</strong> — 포트폴리오 뉴스 탭에서 영문 기사 오른쪽 [번역] 버튼 클릭 시 한국어로 즉시 번역, 다시 클릭하면 원문 복원</div>
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>🔍 주목 종목 상세보기</strong> — 시장 요약 탭의 종목명 클릭 시 왜 좋은지/나쁜지 근거와 최근 뉴스 표시</div>
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>🇰🇷 한국 주식 공시</strong> — DART API로 보유 한국 주식의 최신 공시(자사주취득·유상증자·실적 등) 자동 수집</div>
         </div>
       </div>
       <div class="guide-section" style="margin-bottom:0">
         <div class="guide-section-label">데이터 출처</div>
         <div class="guide-sources">
-          <div class="guide-source-chip"><div class="chip-dot" style="background:#f87171"></div>Finnhub API — 종목별 뉴스 감정 점수 (bullishPercent)</div>
-          <div class="guide-source-chip"><div class="chip-dot" style="background:#fbbf24"></div>Google News RSS — 매크로 키워드 뉴스 수집</div>
+          <div class="guide-source-chip"><div class="chip-dot" style="background:#f87171"></div>Finnhub API — 미국 종목 뉴스 감정 점수</div>
+          <div class="guide-source-chip"><div class="chip-dot" style="background:#fbbf24"></div>Google News RSS — 매크로·한국 주식 키워드 뉴스</div>
           <div class="guide-source-chip"><div class="chip-dot" style="background:#34d399"></div>자체 키워드 감정 분석 — POS/NEG 단어 기반 점수화</div>
+          <div class="guide-source-chip"><div class="chip-dot" style="background:#a78bfa"></div>DART 전자공시 API — 한국 상장사 공시 정보</div>
+          <div class="guide-source-chip"><div class="chip-dot" style="background:#60a5fa"></div>MyMemory API — 영문 뉴스 무료 번역</div>
         </div>
       </div>
     </div>
@@ -1075,7 +1114,8 @@
           <div class="guide-point"><div class="guide-point-dot"></div>예산 입력 → 종목별 % 배분 → 금액·예상 주수 자동 계산</div>
           <div class="guide-point"><div class="guide-point-dot"></div><strong>✨ 스마트 배분 제안</strong> — 리밸런싱 필요도(50%) + 매크로 우호도(30%) + 저점 매수 기회(20%) 자동 계산</div>
           <div class="guide-point"><div class="guide-point-dot"></div>× 버튼으로 이번 달 제외할 종목 설정 (↩ 복원 가능)</div>
-          <div class="guide-point"><div class="guide-point-dot"></div>💡 추천 종목 카드 — 매크로 수혜 미보유 종목 자동 추천</div>
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>🔒 예산 초과 방지</strong> — 비율 직접 조정 시 다른 종목 비율 합산 기준으로 100%를 초과하면 자동 차단, 예산을 절대 넘지 않음</div>
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>💡 추천 종목</strong> — 섹터 필터 칩(테크·금융·헬스케어 등)으로 원하는 섹터만 보기, 🔄 새로고침으로 다른 추천 탐색</div>
           <div class="guide-point"><div class="guide-point-dot"></div>직접 티커 입력으로 임시 추가 가능 (예: MSFT, 035420.KS)</div>
         </div>
       </div>
@@ -1097,6 +1137,73 @@
       </div>
     </div>
 
+    <!-- 투자 원칙 & 체크리스트 -->
+    <div class="guide-card">
+      <div class="guide-header">
+        <div class="guide-icon">📐</div>
+        <div>
+          <div class="guide-title">나만의 투자 원칙 & 리스크 체크리스트</div>
+          <div class="guide-desc">버핏식 바텀업 + 매크로 필터 기반 투자 판단 프레임</div>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-label">버핏 핵심 원칙 5가지</div>
+        <div class="guide-points">
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>① 사업을 산다</strong> — 현금흐름 지속성이 먼저. "테마/유행" 제거, 경기 나빠져도 고객이 사는 구조인가?</div>
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>② 재무는 방어선</strong> — ROE 3년 이상 유지, 부채로 ROE를 뻥튀기했는지 확인</div>
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>③ 가격은 안전마진</strong> — PER 절대값 ❌ / 섹터·자기 역사 대비 ✅. 좋은 회사도 비싸면 안 산다</div>
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>④ 집중하되 망하지 않게</strong> — 핵심 3~5개 + 나머지 분산. 올인 ❌ / 구조 집중 ✅</div>
+          <div class="guide-point"><div class="guide-point-dot"></div><strong>⑤ 시간이 리스크를 줄인다</strong> — 분기 단위 점검. 가격 변동보다 사업 변화를 본다</div>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-label">간단한 밸류에이션 산수 예시</div>
+        <div style="background:var(--surface2);border-radius:10px;padding:12px 16px;font-size:12px;line-height:1.9;color:var(--text)">
+          올해 영업이익 80조 예상 → PER 10배 = 시총 800조 (적정)<br/>
+          지금 시총 528조 → <strong style="color:var(--green)">50% 업사이드는 지극히 정상</strong><br/>
+          <span style="color:var(--muted);font-size:11px">공식: 적정 시총 = 영업이익 × 적정 PER / 지금 시총 = 상승 여력</span>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-label">손절 / 추가매수 규칙 (포트폴리오 탭에서 자동 표시)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:12px;">
+            <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:8px">🔴 손절 기준</div>
+            <div style="font-size:12px;line-height:2">-5% : 무시<br/>-7% : ⚠️ 경고<br/>-10% : 판단<br/>-15% : 🚨 무조건 손절</div>
+          </div>
+          <div style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:12px;">
+            <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:8px">💚 추가매수 기준</div>
+            <div style="font-size:12px;line-height:2">-10% : 1차 (30%)<br/>-15% : 2차 (30%)<br/>-20% : 🚫 금지<br/>&nbsp;</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--muted)">
+          지수(S&P/KODEX200): 손절 느리게 (-15%도 유지), 추가매수 적극 가능<br/>
+          테마/개별주/레버리지: 손절 빠르게 (-10%도 정리), 추가매수 매우 제한
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-label">투자 입장권 체크 (매크로 분석 탭 상단)</div>
+        <div class="guide-points">
+          <div class="guide-point"><div class="guide-point-dot"></div>금리↓ 우호 · 유동성 중립~확대 · 인플레 안정 · 달러 급등 없음 — 4개 조건 체크</div>
+          <div class="guide-point"><div class="guide-point-dot"></div>❌ 2개 이상 → 공격 금지 / ❌ 3개 이상 → 방어 전환</div>
+          <div class="guide-point"><div class="guide-point-dot"></div>Google News RSS 매크로 키워드 분석으로 자동 판정 (뉴스&분석 → 매크로 분석 탭에서 확인)</div>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-label">최종 행동 판정 질문 (제일 중요)</div>
+        <div style="background:linear-gradient(135deg,rgba(124,106,255,.1),rgba(167,139,250,.05));border:1px solid rgba(124,106,255,.2);border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.8;font-style:italic">
+          "지금 이 선택은 <strong style="color:var(--green)">더 벌기 위해서</strong>인가,<br/>
+          <strong style="color:var(--accent2)">덜 잃기 위해서</strong>인가?"<br/>
+          <span style="font-size:11px;color:var(--muted)">더 벌기 → ❌ 조건 다시 확인 &nbsp;·&nbsp; 덜 잃기 → ✅ 실행</span>
+        </div>
+      </div>
+    </div>
+
     <!-- API 키 안내 -->
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:20px 24px;">
       <div style="font-size:13px;font-weight:600;margin-bottom:12px;">🔑 API 키 설정 안내</div>
@@ -1106,8 +1213,11 @@
           <a href="https://www.alphavantage.co/support/#api-key" target="_blank" style="color:var(--accent2);text-decoration:none">alphavantage.co</a>에서 무료 발급 (분당 5회 제한)</div>
         </div>
         <div class="guide-point"><div class="guide-point-dot"></div>
-          <div><strong>Finnhub</strong> — 종목별 뉴스 감정 분석용.
-          <a href="https://finnhub.io" target="_blank" style="color:var(--accent2);text-decoration:none">finnhub.io</a>에서 무료 발급</div>
+          <div><strong>Finnhub</strong> — 미국 종목 뉴스 감정 분석용.
+          <a href="https://finnhub.io" target="_blank" style="color:var(--accent2);text-decoration:none">finnhub.io</a>에서 무료 발급 (분당 60회)</div>
+        </div>
+        <div class="guide-point"><div class="guide-point-dot"></div>
+          <div><strong>DART 전자공시</strong> — 한국 상장사 공시 자동 수집용 (키 내장). 포트폴리오에 한국 주식(.KS) 추가 시 자동으로 DART 공시 조회 — 자사주취득·유상증자·실적 등 반영</div>
         </div>
         <div class="guide-point"><div class="guide-point-dot"></div>API 키 없이도 앱 기본 기능(포트폴리오 관리·배분 플랜)은 사용 가능합니다</div>
       </div>
@@ -1122,6 +1232,7 @@ let apiKey      = '';
 let finnhubKey  = '';
 const TG_TOKEN  = '8688545690:AAG5fmkR6SWE3z5e9RBd5sKxCyW3knx5stw';
 const TG_CHAT   = '8250645779';
+const DART_KEY  = '4c33396367075db4b26e62908fb02452c1252418';
 let newsSentimentBySymbol = {}; // { AAPL: 0.72 } Finnhub bullishPercent → 종합점수 연동
 const DEFAULT_PORTFOLIO = [
   {symbol:'GOOGL', name:'알파벳A',            shares:4.625619, currency:'USD', avgPrice:261.76, dividend:0.80, type:'성장', sector:'Communication Services'},
@@ -1208,8 +1319,29 @@ let newsCache = {};
 let allocPct = {};
 let allocExcluded = new Set(JSON.parse(localStorage.getItem('alloc_excluded') || '[]'));
 let allocExtra = []; // 이번 세션 추가 추천 종목
+let allocRecOffset = 0;     // 추천 새로고침 오프셋
+let allocRecSector = null;  // 추천 섹터 필터 (null=전체)
 let usdKrw = null; // 실시간 환율
 let amountsVisible = JSON.parse(localStorage.getItem('amounts_visible') || 'false');
+
+// ── 공통 헬퍼 (전역 — 중복 방지) ────────────────────────────
+const sentKr    = s => s==='pos'?'긍정':s==='neg'?'부정':'중립';
+const sentColor = s => s==='pos'?'var(--green)':s==='neg'?'var(--red)':'var(--muted)';
+const sentClass = s => s==='pos'?'sent-pos':s==='neg'?'sent-neg':'sent-neu';
+const fmtTime   = t => t ? new Date(t).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+
+/** 뉴스 아이템 HTML (감정분석·상세모달 공통) */
+function newsItemHtml(a, showStock = false) {
+  return `<div class="sd-news-item">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+      <span class="sentiment ${sentClass(a.sentiment)}">${sentKr(a.sentiment)}</span>
+      ${showStock ? `<span style="font-size:11px;font-weight:600;color:var(--accent2)">${a.stockName}</span>` : ''}
+      ${a.source ? `<span style="font-size:10px;color:var(--muted)">${a.source}</span>` : ''}
+      <span style="font-size:10px;color:var(--muted);margin-left:auto">${fmtTime(a.time)}</span>
+    </div>
+    <a href="${a.url||'#'}" target="_blank" style="font-size:12px;color:var(--text);text-decoration:none;line-height:1.6">${a.title}</a>
+  </div>`;
+}
 
 // ── 금액 가리기/보이기 ──────────────────────────────────────
 function toggleAmounts() {
@@ -1287,10 +1419,10 @@ function saveKey() {
   localStorage.setItem('stock_finnhub_key', finnhubKey);
   closeModal();
   checkApiWarn();
-  if (apiKey) refreshPrices();
+  if (apiKey || finnhubKey) refreshPrices();
 }
 function checkApiWarn() {
-  const warn = apiKey ? '' : `<div class="api-warn">⚠️ Alpha Vantage API 키가 없습니다. 🔑 버튼에서 입력해주세요.</div>`;
+  const warn = (apiKey || finnhubKey) ? '' : `<div class="api-warn">⚠️ API 키가 없습니다. 🔑 버튼에서 Finnhub 또는 Alpha Vantage 키를 입력해주세요.</div>`;
   document.getElementById('api-warn-port').innerHTML = warn;
   document.getElementById('api-warn-news').innerHTML = finnhubKey ? '' :
     `<div class="api-warn">⚠️ Finnhub API 키가 없습니다. 🔑 버튼에서 Finnhub 키를 입력하면 뉴스를 불러올 수 있습니다.</div>`;
@@ -1328,7 +1460,7 @@ function confirmAddStock() {
   renderPortfolio();
   renderAlloc();
   renderScore();
-  if (apiKey) fetchPrice(symbol);
+  if (finnhubKey || apiKey) fetchPrice(symbol);
 }
 
 function deleteStock(symbol) {
@@ -1434,20 +1566,107 @@ function confirmBuyMore() {
 }
 
 // ── 가격 조회 ──────────────────────────────────────────
+// Stooq CSV 시세 (무료, 인증 불필요 — 미국 주식)
+// Stooq 심볼 별칭 (일부 종목은 다른 심볼 사용)
+const STOOQ_ALIAS = { 'GOOGL':'goog.us', 'BRK.B':'brkb.us', 'BRK.A':'brka.us' };
+
+async function fetchStooqPrice(symbol) {
+  const isKr = symbol.includes('.KS') || symbol.includes('.KQ');
+  const sym  = STOOQ_ALIAS[symbol] || (isKr
+    ? symbol.toLowerCase().replace('.ks', '.kp').replace('.kq', '.kq')
+    : symbol.toLowerCase().replace(/[^a-z0-9]/g, '') + '.us');
+  const url  = `https://stooq.com/q/d/l/?s=${sym}&i=d`;
+  const proxies = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  ];
+  for (const p of proxies) {
+    try {
+      const res  = await fetch(p, { signal: AbortSignal.timeout(10000) });
+      const text = await res.text();
+      const lines = text.trim().split('\n').filter(l => l && !/^Date/i.test(l));
+      if (!lines.length) continue;
+      const cols  = lines[lines.length - 1].split(',');
+      const price = parseFloat(cols[4]); // Close
+      if (!price || isNaN(price)) continue;
+      const prev2  = lines.length > 1 ? lines[lines.length - 2].split(',') : null;
+      const prevClose = prev2 ? parseFloat(prev2[4]) || price : price;
+      const change    = price - prevClose;
+      const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
+      return { price, prevClose, change, changePct };
+    } catch(e) { continue; }
+  }
+  return null;
+}
+
+// Yahoo Finance 시세 (무료, API 키 불필요 — 폴백용)
+async function fetchYahooPrice(symbol) {
+  const yhUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  const proxies = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(yhUrl)}`,
+    `https://corsproxy.io/?${encodeURIComponent(yhUrl)}`,
+  ];
+  for (const proxyUrl of proxies) {
+    try {
+      const res  = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch { continue; }
+      if (json?.contents) try { json = JSON.parse(json.contents); } catch { continue; }
+      const meta = json?.chart?.result?.[0]?.meta;
+      if (!meta?.regularMarketPrice) continue;
+      const price     = meta.regularMarketPrice;
+      const prevClose = meta.previousClose || meta.chartPreviousClose || price;
+      const change    = price - prevClose;
+      const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
+      return { price, prevClose, change, changePct };
+    } catch(e) { continue; }
+  }
+  return null;
+}
+
+// Finnhub 실시간 시세 (분당 60회, 무료)
+async function fetchFinnhubQuote(symbol) {
+  if (!finnhubKey) return null;
+  try {
+    const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${finnhubKey}`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null; // 403/429 등 조용히 무시
+    const json = await res.json();
+    if (!json || !json.c || json.c === 0) return null;
+    const price     = json.c;
+    const prevClose = json.pc || 0;
+    const change    = json.d  ?? (price - prevClose);
+    const changePct = json.dp ?? (prevClose > 0 ? (change / prevClose) * 100 : 0);
+    return { price, prevClose, change, changePct };
+  } catch(e) { return null; }
+}
+
 async function fetchPrice(symbol, storeAs) {
-  if (!apiKey) return;
   const key = storeAs || symbol;
+  const isKrStock = symbol.includes('.KS') || symbol.includes('.KQ');
+
+  // 1차: Finnhub (미국 종목, 분당 60회)
+  if (finnhubKey && !isKrStock) {
+    const q = await fetchFinnhubQuote(symbol);
+    if (q) { prices[key] = q; return; }
+  }
+
+  // 2차: Stooq CSV (무료, 인증 불필요)
+  const sq = await fetchStooqPrice(symbol);
+  if (sq) { prices[key] = sq; return; }
+
+  // 3차: Yahoo Finance (폴백)
+  const yq = await fetchYahooPrice(symbol);
+  if (yq) { prices[key] = yq; return; }
+
+  // 4차: Alpha Vantage (최후 폴백)
+  if (!apiKey) return;
   try {
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`;
-    const res = await fetch(url);
+    const res  = await fetch(url);
     const json = await res.json();
-
-    // Rate limit 감지
-    if (json['Note'] || json['Information']) {
-      console.warn('API 한도 초과:', symbol);
-      return;
-    }
-
+    if (json['Note'] || json['Information']) { console.warn('API 한도 초과:', symbol); return; }
     const q = json['Global Quote'];
     if (!q || !q['05. price']) return;
     const price     = parseFloat(q['05. price']);
@@ -1494,7 +1713,7 @@ async function fetchExchangeRate() {
 let refreshing = false;
 
 async function refreshPrices() {
-  if (!apiKey) { openModal(); return; }
+  if (!finnhubKey && !apiKey) { openModal(); return; }
   if (refreshing) return;
   refreshing = true;
 
@@ -1505,38 +1724,38 @@ async function refreshPrices() {
   await fetchExchangeRate();
   renderPortfolio();
 
-  // 종목 순차 조회 — 12초 간격 (무료 플랜 분당 5회 제한)
-  const usdStocks = portfolio.filter(s => s.currency === 'USD');
-  const krStocks  = portfolio.filter(s => s.currency === 'KRW');
-
-  // 벤치마크 심볼 (포트폴리오 외 — KOSPI·KOSDAQ 텔레그램 표시용)
+  const usdStocks  = portfolio.filter(s => s.currency === 'USD');
+  const krStocks   = portfolio.filter(s => s.currency === 'KRW');
   const benchmarks = ['069500.KS', '229200.KS'].filter(sym => !portfolio.some(s => s.symbol === sym));
 
-  let done = 0;
+  let done  = 0;
   const total = usdStocks.length + krStocks.length + benchmarks.length;
 
+  // ── 미국 주식: Finnhub → Yahoo Finance → Alpha Vantage 순
   for (const s of usdStocks) {
     await fetchPrice(s.symbol);
     done++;
     renderPortfolio();
     if (btn) btn.textContent = `조회 중 ${done}/${total}`;
-    if (done < total) await sleep(12000); // 12초 대기
+    // Finnhub/Yahoo는 빠름, Alpha Vantage만 12초 대기
+    if (!finnhubKey && !prices[s.symbol] && apiKey && done < total) await sleep(12000);
+    else if (done < total) await sleep(500); // 프록시 과부하 방지
   }
 
+  // ── 한국 주식: Yahoo Finance → Alpha Vantage
   for (const s of krStocks) {
     await fetchKRPrice(s.symbol);
     done++;
     renderPortfolio();
     if (btn) btn.textContent = `조회 중 ${done}/${total}`;
-    if (done < total) await sleep(12000);
+    if (done < total) await sleep(800);
   }
 
-  // 벤치마크 (KOSPI ETF / KOSDAQ ETF) 조회
+  // ── 벤치마크 ETF (KOSPI / KOSDAQ)
   for (const sym of benchmarks) {
     await fetchPrice(sym, sym);
     done++;
-    if (btn) btn.textContent = `조회 중 ${done}/${total}`;
-    if (done < total) await sleep(12000);
+    if (done < total) await sleep(800);
   }
 
   refreshing = false;
@@ -1545,8 +1764,14 @@ async function refreshPrices() {
 }
 
 async function fetchKRPrice(symbol) {
-  // 한국 주식은 .KS 붙여서 Alpha Vantage 조회
   const avSymbol = symbol.includes('.') ? symbol : symbol + '.KS';
+  // 1차: Stooq CSV
+  const sq = await fetchStooqPrice(avSymbol);
+  if (sq) { prices[symbol] = sq; return; }
+  // 2차: Yahoo Finance
+  const yq = await fetchYahooPrice(avSymbol);
+  if (yq) { prices[symbol] = yq; return; }
+  // 3차: Alpha Vantage 폴백
   return fetchPrice(avSymbol, symbol);
 }
 
@@ -1623,7 +1848,12 @@ function renderPortfolio() {
         ${cur ? (pnl>=0?'+':'')+fmt(Math.abs(pnl),s.currency) : '—'}
         ${pnlKrwStr}
       </td>
-      <td class="${pnlClass}">${cur ? (pct>=0?'+':'')+pct.toFixed(2)+'%' : '—'}</td>
+      <td class="${pnlClass}">
+        ${cur ? (pct>=0?'+':'')+pct.toFixed(2)+'%' : '—'}
+        ${cur && pct <= -15 ? `<div style="font-size:9px;background:rgba(248,113,113,.2);color:var(--red);border-radius:4px;padding:1px 5px;margin-top:2px;font-weight:700;white-space:nowrap">🚨 손절 구간</div>` :
+          cur && pct <= -10 ? `<div style="font-size:9px;background:rgba(248,113,113,.12);color:var(--red);border-radius:4px;padding:1px 5px;margin-top:2px;font-weight:600;white-space:nowrap">🔴 추가매수 ①</div>` :
+          cur && pct <= -7  ? `<div style="font-size:9px;background:rgba(251,146,60,.15);color:var(--orange);border-radius:4px;padding:1px 5px;margin-top:2px;font-weight:600;white-space:nowrap">⚠️ 경고</div>` : ''}
+      </td>
       <td>
         ${s.dividend ? `${fmt(s.dividend,s.currency)}<div style="font-size:11px;color:var(--muted)">${divYield.toFixed(2)}%</div>` : '<span class="neutral">—</span>'}
       </td>
@@ -1764,13 +1994,36 @@ async function fetchGoogleRss(query, lang = 'en') {
   const hl   = lang==='ko' ? 'ko'    : 'en-US';
   const gl   = lang==='ko' ? 'KR'    : 'US';
   const ceid = lang==='ko' ? 'KR:ko' : 'US:en';
-  const rssUrl   = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
+  // 한국어 검색은 "뉴스" 키워드 보강 (Google 인식률 향상)
+  const q      = lang==='ko' ? query + ' 뉴스' : query;
+  const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
+
+  // Proxy 1: allorigins (JSON 래핑)
   try {
-    const res  = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-    const json = await res.json();
-    return parseRssItems(json.contents || '');
-  } catch(e) { return []; }
+    const res   = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`, { signal: AbortSignal.timeout(8000) });
+    const json  = await res.json();
+    const items = parseRssItems(json.contents || '');
+    if (items.length > 0) return items;
+  } catch(e) {}
+
+  // Proxy 2: corsproxy.io (원본 XML 반환)
+  try {
+    const res   = await fetch(`https://corsproxy.io/?${encodeURIComponent(rssUrl)}`, { signal: AbortSignal.timeout(8000) });
+    const text  = await res.text();
+    const items = parseRssItems(text);
+    if (items.length > 0) return items;
+  } catch(e) {}
+
+  // Proxy 3: rss2json (최후 수단)
+  try {
+    const res   = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`, { signal: AbortSignal.timeout(8000) });
+    const json  = await res.json();
+    if (json.items?.length) return json.items.map(i => ({
+      title: i.title, url: i.link, pubDate: new Date(i.pubDate).getTime(), source: i.author || 'Google 뉴스'
+    }));
+  } catch(e) {}
+
+  return [];
 }
 
 async function fetchFinnhubCompanyNews(symbol, days = 7) {
@@ -1856,6 +2109,7 @@ async function loadNews() {
     ownedSecRssResults,
     watchSecRssResults,
     macroRssResults,
+    dartResults,
   ] = await Promise.all([
     Promise.all(usdStocks.map(s => fetchFinnhubCompanyNews(s.symbol).then(arr => ({ symbol:s.symbol, arr })))),
     Promise.all(usdStocks.map(s => fetchFinnhubSentiment(s.symbol).then(v  => ({ symbol:s.symbol, v  })))),
@@ -1877,6 +2131,8 @@ async function loadNews() {
           items: deduplicateArticles([...ko, ...en].map(a => ({ ...a, ...keywordSentiment(a.title) })).sort((a,b) => (b.pubDate||0)-(a.pubDate||0)))
         }))
     )),
+    // DART 공시 (한국 주식)
+    fetchDartDisclosures(krStocks),
   ]);
 
   // 감정점수 맵
@@ -1904,6 +2160,9 @@ async function loadNews() {
         symbol, stockName:name, sector:stock?.sector||null, ...ks, isKorean:true });
     });
   });
+
+  // DART 공시 병합
+  dartResults.forEach(a => rawStock.push(a));
 
   // 2차: 중복 제거 + 최신순 정렬
   const stockArticles = deduplicateArticles(rawStock).sort((a,b) => (b.time||0)-(a.time||0));
@@ -1969,15 +2228,11 @@ async function loadNews() {
 
 function renderNewsFromFeed(data, fromCache) {
   const { stockArticles=[], sectorArticles=[], marketArticles=[], macroArticles={}, ts } = data;
+  window._stockArticlesData = stockArticles; // 감정분석 클릭 필터용 전역 저장
   const h = ts ? Math.round((Date.now()-ts)/3600000) : 0;
   const total = stockArticles.length + sectorArticles.reduce((s,x)=>s+x.items.length,0) + marketArticles.length;
   document.getElementById('news-updated').textContent = fromCache
     ? `캐시 (${h}시간 전) · ${total}건` : `업데이트: ${new Date().toLocaleTimeString('ko-KR')} · ${total}건`;
-
-  const sentKr    = s => s==='pos'?'긍정':s==='neg'?'부정':'중립';
-  const sentColor = s => s==='pos'?'var(--green)':s==='neg'?'var(--red)':'var(--muted)';
-  const sentClass = s => s==='pos'?'sent-pos':s==='neg'?'sent-neg':'sent-neu';
-  const fmtTime   = t => t ? new Date(t).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
 
   // ── 0. 매크로 대시보드 ──
   const macroDir = r => r > 0.2 ? '↑' : r < -0.2 ? '↓' : '→';
@@ -2077,16 +2332,50 @@ function renderNewsFromFeed(data, fromCache) {
       </div>
     </div>` : '';
 
+  // ── 투자 입장권 체크 (바텀업 매크로 필터) ──
+  const entryChecks = [
+    { q:'금리 방향이 주식에 우호적 (금리↓)',      ok: macroRegime.rates   <  -0.05 },
+    { q:'유동성 축소 아닌 중립~확대 국면',          ok: macroRegime.rates   <=  0.15 },
+    { q:'인플레이션 급등 신호 없음',                ok: macroRegime.inflation < 0.25 },
+    { q:'달러 급등·신용 경색 신호 없음',            ok: macroRegime.dollar   <  0.30 },
+  ];
+  const noCount = entryChecks.filter(c => !c.ok).length;
+  const ticketLabel = noCount >= 3 ? '🛡 방어 전환' : noCount >= 2 ? '🚫 공격 금지' : noCount === 1 ? '⚠️ 주의' : '✅ 입장 가능';
+  const ticketClr   = noCount >= 3 ? 'var(--red)' : noCount >= 2 ? 'var(--orange)' : noCount === 1 ? 'var(--yellow)' : 'var(--green)';
+  const ticketBg    = noCount >= 3 ? 'rgba(248,113,113,.08)' : noCount >= 2 ? 'rgba(251,146,60,.08)' : noCount === 1 ? 'rgba(251,191,36,.06)' : 'rgba(52,211,153,.06)';
+  const entryHtml = `
+    <div style="background:${ticketBg};border:1px solid ${ticketClr}33;border-radius:14px;padding:16px 18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:13px;font-weight:700">📋 투자 입장권 체크</div>
+        <div style="font-size:15px;font-weight:800;color:${ticketClr}">${ticketLabel}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        ${entryChecks.map(c => `
+          <div style="display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.04);border-radius:8px;padding:7px 10px;">
+            <span style="font-size:14px">${c.ok ? '✅' : '❌'}</span>
+            <span style="font-size:11px;color:${c.ok ? 'var(--text)' : 'var(--muted)'}">${c.q}</span>
+          </div>`).join('')}
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:10px">
+        ❌ 2개 이상 → 공격 금지 &nbsp;·&nbsp; ❌ 3개 이상 → 방어 전환
+      </div>
+    </div>`;
+
   document.getElementById('news-macro-body').innerHTML = `
+    ${entryHtml}
     <div class="macro-grid">${macroCardsHtml}</div>
     ${impactHtml}
     <div style="font-size:10px;color:var(--muted);margin-top:8px;padding:0 4px">* Google News RSS 키워드 분석 기반 · 투자 권유 아님</div>`;
 
   // ── 1. 포트폴리오 뉴스 ──
   const allStock = [...stockArticles].sort((a,b)=>(b.time||0)-(a.time||0));
-  document.getElementById('news-portfolio-body').innerHTML = allStock.slice(0,25).map(a => `
-    <div class="news-item">
-      <div class="news-title"><a href="${a.url||'#'}" target="_blank" style="color:inherit;text-decoration:none">${a.title}</a></div>
+  window._portfolioNewsItems = allStock.slice(0,25);
+  document.getElementById('news-portfolio-body').innerHTML = window._portfolioNewsItems.map((a,idx) => `
+    <div class="news-item" id="ni-${idx}">
+      <div class="news-title" style="display:flex;align-items:flex-start;gap:8px;">
+        <a href="${a.url||'#'}" target="_blank" style="color:inherit;text-decoration:none;flex:1" id="nt-${idx}">${a.title}</a>
+        ${!a.isKorean ? `<button class="tr-btn" id="tb-${idx}" onclick="translateNews(${idx})">번역</button>` : ''}
+      </div>
       <div class="news-meta">
         <span class="sentiment ${sentClass(a.sentiment)}">${sentKr(a.sentiment)}</span>
         <span class="news-ticker" style="${a.isKorean?'color:var(--yellow)':''}">${a.stockName}</span>
@@ -2154,16 +2443,17 @@ function renderNewsFromFeed(data, fromCache) {
     }).join('');
 
   document.getElementById('news-sentiment-body').innerHTML = `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;text-align:right">카드를 클릭하면 해당 뉴스를 볼 수 있어요</div>
     <div class="sent-overview">
-      <div class="sent-card" style="border-color:rgba(52,211,153,.2);background:rgba(52,211,153,.03)">
+      <div class="sent-card" id="sc-pos" onclick="filterSentiment('pos')" style="border-color:rgba(52,211,153,.2);background:rgba(52,211,153,.03);cursor:pointer;transition:transform .15s,box-shadow .15s">
         <div class="sent-card-val" style="color:var(--green)">${posPct}%</div>
         <div class="sent-card-lbl">긍정 (${posTotal}건)</div>
       </div>
-      <div class="sent-card" style="border-color:rgba(255,255,255,.08)">
+      <div class="sent-card" id="sc-neu" onclick="filterSentiment('neu')" style="border-color:rgba(255,255,255,.08);cursor:pointer;transition:transform .15s,box-shadow .15s">
         <div class="sent-card-val" style="color:var(--muted)">${neuPct}%</div>
         <div class="sent-card-lbl">중립 (${neuTotal}건)</div>
       </div>
-      <div class="sent-card" style="border-color:rgba(248,113,113,.2);background:rgba(248,113,113,.03)">
+      <div class="sent-card" id="sc-neg" onclick="filterSentiment('neg')" style="border-color:rgba(248,113,113,.2);background:rgba(248,113,113,.03);cursor:pointer;transition:transform .15s,box-shadow .15s">
         <div class="sent-card-val" style="color:var(--red)">${negPct}%</div>
         <div class="sent-card-lbl">부정 (${negTotal}건)</div>
       </div>
@@ -2173,6 +2463,7 @@ function renderNewsFromFeed(data, fromCache) {
       <div class="sent-bar-neu" style="width:${neuPct}%"></div>
       <div class="sent-bar-neg" style="width:${negPct}%"></div>
     </div>
+    <div id="sent-filter-detail"></div>
     ${finnhubRows ? `<div class="card-title" style="margin:16px 0 10px">📡 Finnhub 감정 지수 (미국 종목)</div><div>${finnhubRows}</div>` : ''}
     ${rssRows ? `<div class="card-title" style="margin:16px 0 10px">📰 키워드 감정 분석 (전 종목)</div><div>${rssRows}</div>` : ''}`;
 
@@ -2181,11 +2472,7 @@ function renderNewsFromFeed(data, fromCache) {
     const posN = items.filter(a=>a.sentiment==='pos').length;
     const negN = items.filter(a=>a.sentiment==='neg').length;
     const mood = posN>negN?'pos':negN>posN?'neg':'neu';
-    const newsItems = items.slice(0,4).map(a => `
-      <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;">
-        <span class="sentiment ${sentClass(a.sentiment)}" style="margin-right:6px">${sentKr(a.sentiment)}</span>
-        <a href="${a.url||'#'}" target="_blank" style="color:var(--text);text-decoration:none">${a.title}</a>
-      </div>`).join('');
+    const newsItems = items.slice(0,4).map(a => newsItemHtml(a)).join('');
     const watchBadge = watched
       ? `<span style="font-size:10px;background:rgba(251,191,36,.15);color:var(--yellow);padding:2px 8px;border-radius:10px;margin-left:6px">주목 섹터</span>` : '';
     return `<div class="card sector-news-group" style="${watched?'border-color:rgba(251,191,36,.25)':''}">
@@ -2207,18 +2494,18 @@ function renderNewsFromFeed(data, fromCache) {
   const moodBg      = overallMood==='pos'?'rgba(52,211,153,.08)':overallMood==='neg'?'rgba(248,113,113,.08)':'rgba(255,255,255,.04)';
   const moodClr     = sentColor(overallMood);
 
-  const topBull = Object.entries(sentBySymbol).filter(([,v])=>v.total>0)
-    .sort(([,a],[,b])=>(b.scoreSum/b.total)-(a.scoreSum/a.total)).slice(0,3).map(([,v])=>v.name).join(', ');
-  const topBear = Object.entries(sentBySymbol).filter(([,v])=>v.total>0)
-    .sort(([,a],[,b])=>(a.scoreSum/a.total)-(b.scoreSum/b.total)).slice(0,2).map(([,v])=>v.name).join(', ');
+  window._sentBySymbolData  = sentBySymbol;
+  window._stockArticlesData = stockArticles;
+  const topBullEntries = Object.entries(sentBySymbol).filter(([,v])=>v.total>0)
+    .sort(([,a],[,b])=>(b.scoreSum/b.total)-(a.scoreSum/a.total)).slice(0,3);
+  const topBearEntries = Object.entries(sentBySymbol).filter(([,v])=>v.total>0)
+    .sort(([,a],[,b])=>(a.scoreSum/a.total)-(b.scoreSum/b.total)).slice(0,2);
+  const topBull = topBullEntries.map(([sym,v])=>`<strong class="stock-clickable" onclick="showStockDetail('${sym}')" style="color:var(--green)">${v.name}</strong>`).join(', ');
+  const topBear = topBearEntries.map(([sym,v])=>`<strong class="stock-clickable" onclick="showStockDetail('${sym}')" style="color:var(--red)">${v.name}</strong>`).join(', ');
   const topSec = sectorArticles
     .map(sa=>({...sa, posRatio:sa.items.filter(a=>a.sentiment==='pos').length/Math.max(1,sa.items.length)}))
     .sort((a,b)=>b.posRatio-a.posRatio)[0];
-  const recentMarket = marketArticles.slice(0,5).map(a => `
-    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;">
-      <span class="sentiment ${sentClass(a.sentiment)}" style="margin-right:6px">${sentKr(a.sentiment)}</span>
-      <a href="${a.url||'#'}" target="_blank" style="color:var(--text);text-decoration:none">${a.title}</a>
-    </div>`).join('');
+  const recentMarket = marketArticles.slice(0,5).map(a => newsItemHtml(a)).join('');
 
   document.getElementById('news-summary-body').innerHTML = `
     <div class="summary-mood" style="background:${moodBg};border:1px solid rgba(255,255,255,.06)">
@@ -2229,8 +2516,8 @@ function renderNewsFromFeed(data, fromCache) {
     <div class="summary-insight">
       <div class="summary-insight-title">📈 주목 종목</div>
       <div class="summary-insight-text">
-        ${topBull?`<strong style="color:var(--green)">${topBull}</strong>에 긍정적 뉴스 흐름이 우세합니다.`:''}
-        ${topBear?`반면 <strong style="color:var(--red)">${topBear}</strong>은 부정적 센티먼트가 상대적으로 높습니다.`:''}
+        ${topBull?`${topBull}에 긍정적 뉴스 흐름이 우세합니다. <span style="font-size:11px;color:var(--muted)">(클릭해서 상세보기)</span>`:''}
+        ${topBear?`<br>반면 ${topBear}은 부정적 센티먼트가 상대적으로 높습니다.`:''}
       </div>
     </div>
     ${topSec?`<div class="summary-insight">
@@ -2549,15 +2836,23 @@ function renderAlloc() {
   document.getElementById('alloc-budget-label').textContent = '₩' + budget.toLocaleString('ko');
   const remain = budget - totalSpend;
   const remEl  = document.getElementById('alloc-remain');
-  remEl.textContent = remain !== 0 ? `(잔여 ${remain>=0?'+':''}${remain.toLocaleString()}원)` : '';
-  remEl.style.color = remain === 0 ? 'var(--green)' : 'var(--yellow)';
+  remEl.textContent = remain > 0 ? `(잔여 +${remain.toLocaleString()}원)` : remain < 0 ? `(${remain.toLocaleString()}원 초과!)` : '(예산 딱 맞음 ✓)';
+  remEl.style.color = remain < 0 ? 'var(--red)' : remain === 0 ? 'var(--green)' : 'var(--yellow)';
 
   renderAllocAnalysis(budget);
   renderAllocRecommendations();
 }
 
 function updateAlloc(symbol, val) {
-  allocPct[symbol] = Math.max(0, Math.min(100, parseInt(val)||0));
+  const newVal = Math.max(0, parseInt(val) || 0);
+  const activeList = [
+    ...portfolio.filter(s => !allocExcluded.has(s.symbol)),
+    ...allocExtra,
+  ];
+  const otherSum   = activeList.filter(s => s.symbol !== symbol)
+                               .reduce((sum, s) => sum + (allocPct[s.symbol] || 0), 0);
+  const maxAllowed = Math.max(0, 100 - otherSum);
+  allocPct[symbol] = Math.min(newVal, maxAllowed);
   renderAlloc();
 }
 
@@ -2601,6 +2896,14 @@ function smartAlloc() {
 }
 
 // 추천 종목 렌더링
+const _SECTOR_KR = {
+  'Information Technology':'테크', 'Financials':'금융',
+  'Consumer Staples':'필수소비재', 'Communication Services':'커뮤니케이션',
+  'ETF — Broad Market':'ETF 전체', 'Health Care':'헬스케어',
+  'Consumer Discretionary':'경기소비재', 'Energy':'에너지',
+  'Real Estate':'부동산', 'Industrials':'산업재', 'Materials':'소재',
+};
+
 function renderAllocRecommendations() {
   const wrap = document.getElementById('alloc-rec-wrap');
   const el   = document.getElementById('alloc-rec');
@@ -2611,31 +2914,79 @@ function renderAllocRecommendations() {
     ...allocExtra.map(s => s.symbol),
   ]);
 
-  // 이미 포트폴리오에 없는 추천 종목 필터링 + 매크로 점수 정렬 (최대 4개)
-  const recs = RECOMMENDED_STOCKS
+  // 미보유 종목 + 매크로 점수 계산
+  const available = RECOMMENDED_STOCKS
     .filter(s => !portfolioSymbols.has(s.symbol))
-    .map(s => ({ ...s, macroScore: macroScoreForSector(s.sector) }))
-    .sort((a, b) => b.macroScore - a.macroScore)
-    .slice(0, 4);
+    .map(s => ({ ...s, macroScore: macroScoreForSector(s.sector) }));
 
-  if (!recs.length) { wrap.style.display = 'none'; return; }
+  if (!available.length) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
 
-  el.innerHTML = recs.map(s => {
+  // 섹터 목록 (필터용)
+  const sectors = [...new Set(available.map(s => s.sector))];
+
+  // 섹터 필터 적용
+  const filtered = allocRecSector
+    ? available.filter(s => s.sector === allocRecSector)
+    : available;
+
+  // 매크로 점수 정렬 후 오프셋 기반 순환
+  const sorted = [...filtered].sort((a, b) => b.macroScore - a.macroScore);
+  const PER_PAGE = Math.min(4, sorted.length);
+  const offset   = allocRecOffset % Math.max(1, sorted.length);
+  const recs     = Array.from({ length: PER_PAGE }, (_, i) => sorted[(offset + i) % sorted.length]);
+
+  // 섹터 필터 칩
+  const pillStyle = active =>
+    active ? 'background:var(--accent);border:1px solid var(--accent);color:#fff'
+           : 'background:transparent;border:1px solid var(--border);color:var(--muted)';
+  const pillsHtml = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+    <button onclick="setAllocRecSector(null)" style="padding:5px 13px;border-radius:100px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .2s;${pillStyle(!allocRecSector)}">전체</button>
+    ${sectors.map(sec => `<button onclick="setAllocRecSector('${sec}')" style="padding:5px 13px;border-radius:100px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .2s;${pillStyle(allocRecSector===sec)}">${_SECTOR_KR[sec]||sec}</button>`).join('')}
+  </div>`;
+
+  const cardsHtml = recs.map(s => {
     const isKR     = s.currency === 'KRW';
     const symLabel = isKR ? s.name : s.symbol;
     const subLabel = isKR ? s.symbol.replace('.KS','') : s.name;
     const mScore   = Math.round(s.macroScore * 100);
     const mColor   = mScore >= 60 ? 'var(--green)' : mScore >= 40 ? 'var(--yellow)' : 'var(--muted)';
+    const secLabel = _SECTOR_KR[s.sector] || s.sector;
     return `<div class="alloc-rec-card">
       <div class="alloc-rec-info">
-        <div class="alloc-rec-sym">${symLabel} <span style="font-size:10px;color:var(--muted);font-weight:400">${subLabel}</span></div>
+        <div class="alloc-rec-sym">
+          ${symLabel}
+          <span style="font-size:10px;color:var(--muted);font-weight:400">${subLabel}</span>
+          <span style="font-size:10px;background:rgba(255,255,255,.06);color:var(--muted);padding:1px 7px;border-radius:10px;margin-left:4px">${secLabel}</span>
+        </div>
         <div class="alloc-rec-reason">${s.reason}</div>
         <div style="font-size:10px;margin-top:4px;color:${mColor}">매크로 우호도 ${mScore}%</div>
       </div>
       <button class="alloc-rec-add" onclick="addRecToAlloc('${s.symbol}')">+ 이번 달 추가</button>
     </div>`;
   }).join('');
+
+  // 페이지 표시 (전체 몇 개 중)
+  const pageHtml = sorted.length > PER_PAGE
+    ? `<div style="text-align:center;font-size:10px;color:var(--muted);margin-top:10px">${offset+1}–${Math.min(offset+PER_PAGE, sorted.length)} / ${sorted.length}종목 · 🔄 새로고침으로 더 보기</div>`
+    : '';
+
+  el.innerHTML = pillsHtml + cardsHtml + pageHtml;
+}
+
+function setAllocRecSector(sec) {
+  allocRecSector = sec;
+  allocRecOffset = 0;
+  renderAllocRecommendations();
+}
+
+function refreshAllocRecs() {
+  const portfolioSymbols = new Set([...portfolio.map(s => s.symbol), ...allocExtra.map(s => s.symbol)]);
+  const available = RECOMMENDED_STOCKS.filter(s => !portfolioSymbols.has(s.symbol));
+  const filtered  = allocRecSector ? available.filter(s => s.sector === allocRecSector) : available;
+  const step      = Math.max(1, Math.min(2, Math.floor(filtered.length / 2)));
+  allocRecOffset  = (allocRecOffset + step) % Math.max(1, filtered.length);
+  renderAllocRecommendations();
 }
 
 // ── 종합 점수 ──────────────────────────────────────────
@@ -3034,25 +3385,31 @@ async function sendToTelegramPreUS() {
 }
 
 // ── 텔레그램 자동 스케줄러 (08:00 모닝 / 15:00 오후) ────────
-let _tgMorningSentDate = null;
-let _tgPreUSSentDate   = null;
+// 발송 날짜를 localStorage에 저장 — 페이지 새로고침 후에도 중복 발송 방지
+function _tgGetSent(key)      { return localStorage.getItem('tg_sent_' + key) || ''; }
+function _tgSetSent(key, val) { localStorage.setItem('tg_sent_' + key, val); }
+
+function _tgCheckAndSend() {
+  const now   = new Date();
+  const today = now.toDateString();
+  const h = now.getHours();
+  const m = now.getMinutes();
+
+  // 08:00~08:09 — 모닝 리포트 (10분 창)
+  if (h === 8 && m <= 9 && _tgGetSent('morning') !== today) {
+    _tgSetSent('morning', today);
+    sendToTelegramMorning();
+  }
+  // 15:00~15:09 — 오후 리포트 (10분 창)
+  if (h === 15 && m <= 9 && _tgGetSent('preus') !== today) {
+    _tgSetSent('preus', today);
+    sendToTelegramPreUS();
+  }
+}
 
 function initTelegramScheduler() {
-  setInterval(() => {
-    const now   = new Date();
-    const today = now.toDateString();
-    const h = now.getHours();
-    const m = now.getMinutes();
-
-    if (h === 8  && m <= 1 && _tgMorningSentDate !== today) {
-      _tgMorningSentDate = today;
-      sendToTelegramMorning();
-    }
-    if (h === 15 && m <= 1 && _tgPreUSSentDate !== today) {
-      _tgPreUSSentDate = today;
-      sendToTelegramPreUS();
-    }
-  }, 30000); // 30초마다 체크
+  _tgCheckAndSend();           // 페이지 로드 즉시 1회 체크 (새로고침 후 복구)
+  setInterval(_tgCheckAndSend, 30000); // 이후 30초마다 체크
 }
 
 function setScoreStyle(style) {
@@ -3720,6 +4077,217 @@ window.onload = () => {
   // 텔레그램 자동 리포트 스케줄러 시작 (08:00 모닝 / 15:00 오후)
   initTelegramScheduler();
 };
+
+// ── 뉴스 번역 (MyMemory 무료 API) ──────────────────────
+async function translateNews(idx) {
+  const item  = (window._portfolioNewsItems || [])[idx];
+  const btn   = document.getElementById('tb-' + idx);
+  const titleEl = document.getElementById('nt-' + idx);
+  if (!item || !btn || !titleEl) return;
+
+  // 토글: 이미 번역됐으면 원문 복원
+  if (btn.dataset.translated === '1') {
+    titleEl.textContent = item.title;
+    btn.textContent = '번역';
+    btn.dataset.translated = '0';
+    return;
+  }
+
+  btn.textContent = '•••';
+  btn.disabled = true;
+  try {
+    const res  = await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(item.title) + '&langpair=en|ko');
+    const data = await res.json();
+    const translated = data?.responseData?.translatedText;
+    if (translated && translated.toLowerCase() !== item.title.toLowerCase()) {
+      titleEl.textContent = translated;
+      btn.textContent = '원문';
+      btn.dataset.translated = '1';
+    } else {
+      btn.textContent = '번역';
+    }
+  } catch(e) {
+    btn.textContent = '번역';
+  }
+  btn.disabled = false;
+}
+
+// ── 종목 뉴스 상세 보기 ────────────────────────────────
+function showStockDetail(sym) {
+
+  const data     = (window._sentBySymbolData  || {})[sym];
+  const articles = (window._stockArticlesData || [])
+    .filter(a => a.symbol === sym)
+    .sort((a,b) => (b.time||0)-(a.time||0))
+    .slice(0, 6);
+
+  if (!data) return;
+
+  const avg         = data.total > 0 ? data.scoreSum / data.total : 0;
+  const overallSent = avg > 0.1 ? 'pos' : avg < -0.1 ? 'neg' : 'neu';
+  const overallClr  = sentColor(overallSent);
+  const overallKr   = sentKr(overallSent);
+  const posPct = Math.round(data.pos  / data.total * 100);
+  const negPct = Math.round(data.neg  / data.total * 100);
+  const neuPct = 100 - posPct - negPct;
+
+  const reasonText = overallSent === 'pos'
+    ? `긍정 뉴스가 전체의 <strong style="color:var(--green)">${posPct}%</strong>로 우세합니다. 최근 ${data.total}건 중 ${data.pos}건이 긍정적이어서 현재 시장 분위기가 우호적입니다.`
+    : overallSent === 'neg'
+    ? `부정 뉴스가 전체의 <strong style="color:var(--red)">${negPct}%</strong>로 높습니다. 최근 ${data.total}건 중 ${data.neg}건이 부정적으로, 단기 리스크 요인이 존재합니다.`
+    : `뉴스 감정이 중립적입니다. 긍정 ${posPct}% · 부정 ${negPct}% · 중립 ${neuPct}%로 방향성이 혼재됩니다.`;
+
+  const barHtml = `
+    <div style="display:flex;height:8px;border-radius:100px;overflow:hidden;margin:10px 0 4px;">
+      <div style="width:${posPct}%;background:var(--green);"></div>
+      <div style="width:${neuPct}%;background:rgba(255,255,255,.15);"></div>
+      <div style="width:${negPct}%;background:var(--red);"></div>
+    </div>
+    <div style="display:flex;gap:14px;font-size:10px;color:var(--muted);">
+      <span><span style="color:var(--green)">●</span> 긍정 ${posPct}%</span>
+      <span><span style="color:var(--muted)">●</span> 중립 ${neuPct}%</span>
+      <span><span style="color:var(--red)">●</span> 부정 ${negPct}%</span>
+    </div>`;
+
+  const articlesHtml = articles.length
+    ? articles.map(a => newsItemHtml(a)).join('')
+    : '<div style="font-size:12px;color:var(--muted);padding:12px 0;">관련 뉴스가 없습니다.</div>';
+
+  document.getElementById('sd-box').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${sym.replace('.KS','')}</div>
+        <div style="font-size:18px;font-weight:700;">${data.name}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:26px;font-weight:800;color:${overallClr}">${overallKr}</div>
+        <div style="font-size:11px;color:var(--muted);">뉴스 ${data.total}건 분석</div>
+      </div>
+    </div>
+    <div style="background:var(--surface2);border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">종합 판단 이유</div>
+      <div style="font-size:13px;line-height:1.7;">${reasonText}</div>
+      ${barHtml}
+    </div>
+    <div style="font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;">최근 뉴스</div>
+    ${articlesHtml}
+    <button onclick="closeSD()" style="width:100%;margin-top:18px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--muted);font-size:13px;cursor:pointer;font-family:inherit;">닫기</button>
+  `;
+  document.getElementById('sd-modal').classList.add('open');
+}
+
+function closeSD() {
+  document.getElementById('sd-modal').classList.remove('open');
+}
+
+// ── 감정분석 카드 클릭 필터 ────────────────────────────
+const SENT_COLOR = {pos:'var(--green)', neu:'var(--muted)', neg:'var(--red)'};
+const SENT_LABEL = {pos:'긍정', neu:'중립', neg:'부정'};
+let _sentFilterActive = null;
+function filterSentiment(type) {
+  const COLOR = SENT_COLOR;
+  const LABEL = SENT_LABEL;
+
+  // 같은 카드 재클릭 → 닫기
+  if (_sentFilterActive === type) {
+    _sentFilterActive = null;
+    document.getElementById('sent-filter-detail').innerHTML = '';
+    ['pos','neu','neg'].forEach(t => {
+      const el = document.getElementById('sc-' + t);
+      if (el) { el.style.transform=''; el.style.boxShadow=''; }
+    });
+    return;
+  }
+  _sentFilterActive = type;
+
+  // 카드 시각 하이라이트
+  ['pos','neu','neg'].forEach(t => {
+    const el = document.getElementById('sc-' + t);
+    if (!el) return;
+    el.style.transform   = t === type ? 'translateY(-4px)' : '';
+    el.style.boxShadow   = t === type ? `0 6px 20px ${COLOR[t]}33` : '';
+  });
+
+  const articles = (window._stockArticlesData || []).filter(a => a.sentiment === type);
+
+  // 종목별 그룹
+  const byStock = {};
+  articles.forEach(a => {
+    if (!byStock[a.stockName]) byStock[a.stockName] = [];
+    byStock[a.stockName].push(a);
+  });
+  const stockNames = Object.keys(byStock).join(' · ');
+
+  const artHtml = articles.slice(0, 12).map(a => newsItemHtml(a, true)).join('');
+
+  document.getElementById('sent-filter-detail').innerHTML = articles.length ? `
+    <div style="background:var(--surface2);border:1px solid ${COLOR[type]}33;border-radius:14px;padding:16px 18px;margin:10px 0 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <span style="font-size:15px;font-weight:700;color:${COLOR[type]}">${LABEL[type]} 뉴스 ${articles.length}건</span>
+          <span style="font-size:11px;color:var(--muted);margin-left:8px">총 ${Object.keys(byStock).length}개 종목</span>
+        </div>
+        <button onclick="filterSentiment('${type}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">✕</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);background:rgba(255,255,255,.04);border-radius:8px;padding:7px 10px;margin-bottom:12px;">
+        관련 종목: <span style="color:var(--text)">${stockNames}</span>
+      </div>
+      ${artHtml}
+      ${articles.length > 12 ? `<div style="text-align:center;font-size:11px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.05)">+${articles.length-12}건 더 있음</div>` : ''}
+    </div>` : `<div class="empty" style="padding:20px">${LABEL[type]} 뉴스가 없습니다.</div>`;
+}
+
+// ── DART 공시 (한국 주식) ──────────────────────────────
+function dartSentiment(reportNm) {
+  if (/자기주식취득|무상증자|자사주취득|주식배당/.test(reportNm)) return { sentiment:'pos', sentimentScore:0.6 };
+  if (/유상증자|전환사채|교환사채|횡령|배임|감자|자기주식처분/.test(reportNm)) return { sentiment:'neg', sentimentScore:-0.5 };
+  if (/실적|매출|영업이익|당기순이익/.test(reportNm)) return { sentiment:'pos', sentimentScore:0.3 };
+  return { sentiment:'neu', sentimentScore:0 };
+}
+
+async function fetchDartDisclosures(krStocks) {
+  if (!krStocks.length) return [];
+  try {
+    const bgn = new Date();
+    bgn.setDate(bgn.getDate() - 45);
+    const bgnStr = bgn.toISOString().slice(0,10).replace(/-/g,'');
+    const today  = new Date().toISOString().slice(0,10).replace(/-/g,'');
+
+    const [kospi, kosdaq] = await Promise.all([
+      fetch(`https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_KEY}&corp_cls=Y&bgn_de=${bgnStr}&end_de=${today}&sort=date&page_count=100`)
+        .then(r=>r.json()).then(d=>d.status==='000'?d.list||[]:[], ()=>[]),
+      fetch(`https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_KEY}&corp_cls=K&bgn_de=${bgnStr}&end_de=${today}&sort=date&page_count=100`)
+        .then(r=>r.json()).then(d=>d.status==='000'?d.list||[]:[], ()=>[]),
+    ]);
+
+    const results = [];
+    [...kospi, ...kosdaq].forEach(d => {
+      const matched = krStocks.find(s =>
+        d.corp_name === s.name ||
+        d.corp_name.replace(/\(주\)|㈜|\s/g,'') === s.name.replace(/\s/g,'') ||
+        s.name.replace(/\s/g,'').includes(d.corp_name.replace(/\(주\)|㈜|\s/g,''))
+      );
+      if (!matched) return;
+      const ds  = dartSentiment(d.report_nm);
+      const dt  = d.rcept_dt.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+      results.push({
+        title: `[공시] ${d.corp_name}: ${d.report_nm}`,
+        url: `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${d.rcept_no}`,
+        source: 'DART 공시',
+        time: new Date(dt).getTime(),
+        symbol: matched.symbol,
+        stockName: matched.name,
+        sector: matched.sector || null,
+        isKorean: true,
+        ...ds,
+      });
+    });
+    return results;
+  } catch(e) {
+    console.warn('DART fetch error:', e);
+    return [];
+  }
+}
 </script>
 </body>
 </html>
