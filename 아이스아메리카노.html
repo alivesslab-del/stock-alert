@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>아이스 아메리카노 — 바보 커피</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Malgun Gothic', '맑은 고딕', 'Noto Sans KR', sans-serif;
+      background: #f7f7f5;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 24px;
+      max-width: 480px;
+      width: 100%;
+      padding: 52px 44px;
+      box-shadow: 0 2px 32px rgba(0,0,0,0.07);
+    }
+
+    /* 브랜드 태그 */
+    .brand-tag {
+      display: inline-block;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+
+    /* 컵 SVG 영역 */
+    .cup-wrapper {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+
+    /* 제품명 */
+    .product-name {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #111;
+      margin-bottom: 6px;
+    }
+
+    .product-sub {
+      font-size: 13px;
+      color: #aaa;
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      margin-bottom: 28px;
+    }
+
+    /* 구분선 */
+    .divider {
+      border: none;
+      border-top: 1px solid #f0f0f0;
+      margin: 28px 0;
+    }
+
+    /* 설명 */
+    .desc-title {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: #bbb;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .desc-body {
+      font-size: 14px;
+      line-height: 1.9;
+      color: #555;
+      font-weight: 300;
+    }
+
+    /* 태그 */
+    .tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .tag {
+      font-size: 11px;
+      padding: 5px 13px;
+      border-radius: 20px;
+      background: #f2f2f0;
+      color: #777;
+      letter-spacing: 0.04em;
+    }
+
+    /* 가격 */
+    .price-section {
+      margin-top: 28px;
+      display: flex;
+      align-items: flex-end;
+      gap: 14px;
+    }
+
+    .price-original {
+      font-size: 16px;
+      color: #ccc;
+      text-decoration: line-through;
+      font-weight: 400;
+      margin-bottom: 2px;
+    }
+
+    .price-sale {
+      font-size: 36px;
+      font-weight: 700;
+      color: #111;
+      letter-spacing: -0.03em;
+    }
+
+    .discount-badge {
+      background: #fff0f0;
+      color: #c0392b;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 13px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      letter-spacing: 0.06em;
+      border: 1px solid rgba(192,57,43,0.18);
+    }
+
+    /* CTA 버튼 */
+    .cta-btn {
+      display: block;
+      width: 100%;
+      margin-top: 32px;
+      padding: 18px;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-size: 14px;
+      font-family: 'Malgun Gothic', '맑은 고딕', 'Noto Sans KR', sans-serif;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .cta-btn:hover {
+      background: #333;
+    }
+
+    .footnote {
+      text-align: center;
+      font-size: 11px;
+      color: #ccc;
+      margin-top: 20px;
+      letter-spacing: 0.04em;
+    }
+
+    /* 로고 */
+    .logo-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 36px;
+    }
+
+    /* ── 모달 오버레이 ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.38);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 24px;
+      width: 92%;
+      max-width: 420px;
+      padding: 40px 36px 36px;
+      box-shadow: 0 8px 48px rgba(0,0,0,0.14);
+      animation: slideUp 0.28s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .modal-close {
+      background: #f2f2f0;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #888;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .modal-close:hover { background: #e8e8e6; }
+
+    /* 옵션 그룹 */
+    .opt-group {
+      margin-bottom: 24px;
+    }
+    .opt-label {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: #aaa;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: block;
+    }
+    .opt-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 1.5px solid #e8e8e8;
+      background: #fff;
+      font-size: 13px;
+      font-family: 'Malgun Gothic', '맑은 고딕', 'Noto Sans KR', sans-serif;
+      color: #555;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .chip:hover {
+      border-color: #bbb;
+      color: #222;
+    }
+    .chip.active {
+      background: #111;
+      border-color: #111;
+      color: #fff;
+    }
+
+    /* 슬라이더 */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slider-row input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: #eee;
+      outline: none;
+    }
+    .slider-row input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #111;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    }
+    .slider-val {
+      font-size: 13px;
+      font-weight: 600;
+      color: #111;
+      min-width: 40px;
+      text-align: right;
+    }
+
+    .modal-divider {
+      border: none;
+      border-top: 1px solid #f0f0f0;
+      margin: 20px 0;
+    }
+
+    /* 주문 확인 버튼 */
+    .modal-confirm {
+      display: block;
+      width: 100%;
+      padding: 17px;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-size: 14px;
+      font-family: 'Malgun Gothic', '맑은 고딕', 'Noto Sans KR', sans-serif;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      margin-top: 28px;
+      transition: background 0.2s;
+    }
+    .modal-confirm:hover { background: #333; }
+
+    /* 완료 메시지 */
+    .done-msg {
+      display: none;
+      text-align: center;
+      padding: 16px 0 4px;
+    }
+    .done-msg .done-icon {
+      font-size: 36px;
+      margin-bottom: 12px;
+    }
+    .done-msg p {
+      font-size: 14px;
+      color: #555;
+      line-height: 1.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <!-- 쑤기 로고 -->
+    <div class="logo-wrap">
+      <svg width="120" height="48" viewBox="0 0 120 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- 배경 pill -->
+        <rect width="120" height="48" rx="14" fill="#111"/>
+        <!-- 왼쪽 스팀 장식 -->
+        <path d="M18 30 Q16 26 18 22 Q20 18 18 14" stroke="#89c8ef" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.7"/>
+        <path d="M23 30 Q21 26 23 22 Q25 18 23 14" stroke="#89c8ef" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.45"/>
+        <!-- 쑤기 텍스트 -->
+        <text x="62" y="31" text-anchor="middle"
+              font-family="'Malgun Gothic','맑은 고딕',sans-serif"
+              font-size="18" font-weight="700"
+              fill="#ffffff"
+              letter-spacing="3">쑤기</text>
+        <!-- 오른쪽 점 장식 -->
+        <circle cx="104" cy="18" r="2.5" fill="#89c8ef" opacity="0.6"/>
+        <circle cx="104" cy="30" r="1.8" fill="#89c8ef" opacity="0.35"/>
+      </svg>
+    </div>
+
+    <span class="brand-tag">바보 커피 · Ice Series</span>
+
+    <!-- 투명 플라스틱 컵 SVG -->
+    <div class="cup-wrapper">
+      <svg width="160" height="220" viewBox="0 0 160 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- 뚜껑 -->
+        <ellipse cx="80" cy="28" rx="56" ry="9" fill="#d0eefc" opacity="0.6"/>
+        <rect x="24" y="22" width="112" height="14" rx="7" fill="#b8e0f7" opacity="0.7"/>
+        <!-- 빨대 구멍 -->
+        <ellipse cx="80" cy="22" rx="6" ry="3" fill="#89c8ef" opacity="0.8"/>
+        <!-- 빨대 -->
+        <rect x="77" y="0" width="6" height="50" rx="3" fill="#89c8ef" opacity="0.85"/>
+
+        <!-- 컵 몸체 (투명 플라스틱 느낌) -->
+        <path d="M28 36 L18 200 Q18 212 30 212 H130 Q142 212 142 200 L132 36 Z"
+              fill="rgba(200,235,255,0.18)" stroke="#a8d8f0" stroke-width="2"/>
+
+        <!-- 컵 하이라이트 (빛 반사) -->
+        <path d="M34 50 L26 185" stroke="rgba(255,255,255,0.7)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M42 50 L36 185" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/>
+
+        <!-- 커피 액체 (꽉 참 — 뚜껑 바로 아래부터) -->
+        <path d="M28.5 42 L18 200 Q18 212 30 212 H130 Q142 212 142 200 L131.5 42 Z"
+              fill="rgba(130,80,40,0.55)"/>
+
+        <!-- 커피 표면 타원 -->
+        <ellipse cx="80" cy="42" rx="51.5" ry="6" fill="rgba(110,65,30,0.65)"/>
+
+        <!-- 얼음 조각들 (커피 위에 떠있는 느낌) -->
+        <rect x="48" y="44" width="26" height="22" rx="4" fill="rgba(210,240,255,0.72)" stroke="rgba(180,220,250,0.8)" stroke-width="1" transform="rotate(-15 61 55)"/>
+        <rect x="84" y="42" width="24" height="20" rx="4" fill="rgba(210,240,255,0.72)" stroke="rgba(180,220,250,0.8)" stroke-width="1" transform="rotate(12 96 52)"/>
+        <rect x="60" y="68" width="30" height="22" rx="4" fill="rgba(210,240,255,0.65)" stroke="rgba(180,220,250,0.7)" stroke-width="1" transform="rotate(-5 75 79)"/>
+        <rect x="38" y="72" width="22" height="18" rx="3" fill="rgba(210,240,255,0.60)" stroke="rgba(180,220,250,0.7)" stroke-width="1" transform="rotate(20 49 81)"/>
+        <rect x="96" y="68" width="22" height="18" rx="3" fill="rgba(210,240,255,0.60)" stroke="rgba(180,220,250,0.7)" stroke-width="1" transform="rotate(-10 107 77)"/>
+
+        <!-- "바보" 텍스트 -->
+        <text x="80" y="155" text-anchor="middle" font-family="'Malgun Gothic','맑은 고딕',sans-serif"
+              font-size="22" font-weight="700" fill="rgba(255,235,200,0.75)" letter-spacing="4">바보</text>
+
+        <!-- 컵 테두리 (아랫부분) -->
+        <ellipse cx="80" cy="208" rx="50" ry="5" fill="rgba(168,216,240,0.3)"/>
+      </svg>
+    </div>
+
+    <div class="product-name">아이스 아메리카노</div>
+    <div class="product-sub">Ice Americano · Bright &amp; Fruity</div>
+
+    <hr class="divider" />
+
+    <div class="desc-title">Product Note</div>
+    <p class="desc-body">
+      밝고 선명한 산미가 특징인 싱글 오리진 원두를 사용했습니다.<br>
+      첫 모금부터 느껴지는 가벼운 과일향과 함께, 깔끔하게 마무리되는 깨끗한 여운이 특징입니다.<br>
+      얼음이 녹아도 밋밋해지지 않는, 끝까지 맛있는 아이스 아메리카노입니다.
+    </p>
+
+    <div class="tags">
+      <span class="tag">산미</span>
+      <span class="tag">과일향</span>
+      <span class="tag">싱글 오리진</span>
+      <span class="tag">라이트 로스팅</span>
+    </div>
+
+    <hr class="divider" />
+
+    <div class="price-section">
+      <div>
+        <div class="price-original">3,500원</div>
+        <div class="price-sale">2,100원</div>
+      </div>
+      <div class="discount-badge">40% OFF</div>
+    </div>
+
+    <button class="cta-btn" onclick="document.getElementById('orderModal').classList.add('open')">지금 주문하기</button>
+    <p class="footnote">한정 수량 · 소진 시 종료</p>
+  </div>
+
+  <!-- 주문 모달 -->
+  <div class="modal-overlay" id="orderModal" onclick="if(event.target===this) closeModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">음료 커스텀</span>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+
+      <!-- 주문 폼 -->
+      <div id="orderForm">
+
+        <!-- 얼음 양 -->
+        <div class="opt-group">
+          <span class="opt-label">얼음 양</span>
+          <div class="opt-chips" id="ice">
+            <button class="chip" onclick="select('ice',this)">없음</button>
+            <button class="chip" onclick="select('ice',this)">적게</button>
+            <button class="chip active" onclick="select('ice',this)">보통</button>
+            <button class="chip" onclick="select('ice',this)">많이</button>
+            <button class="chip" onclick="select('ice',this)">가득</button>
+          </div>
+        </div>
+
+        <hr class="modal-divider" />
+
+        <!-- 물 양 -->
+        <div class="opt-group">
+          <span class="opt-label">물 양</span>
+          <div class="opt-chips" id="water">
+            <button class="chip" onclick="select('water',this)">적게</button>
+            <button class="chip active" onclick="select('water',this)">보통</button>
+            <button class="chip" onclick="select('water',this)">많이</button>
+            <button class="chip" onclick="select('water',this)">물 없음</button>
+          </div>
+        </div>
+
+        <hr class="modal-divider" />
+
+        <!-- 에스프레소 샷 -->
+        <div class="opt-group">
+          <span class="opt-label">에스프레소 샷</span>
+          <div class="opt-chips" id="shot">
+            <button class="chip" onclick="select('shot',this)">하프샷</button>
+            <button class="chip active" onclick="select('shot',this)">1샷</button>
+            <button class="chip" onclick="select('shot',this)">2샷</button>
+            <button class="chip" onclick="select('shot',this)">3샷</button>
+          </div>
+        </div>
+
+        <hr class="modal-divider" />
+
+        <!-- 산미 강도 슬라이더 -->
+        <div class="opt-group">
+          <span class="opt-label">산미 강도</span>
+          <div class="slider-row">
+            <span style="font-size:12px;color:#aaa;">마일드</span>
+            <input type="range" min="1" max="5" value="3" id="acidSlider"
+              oninput="document.getElementById('acidVal').textContent = ['','약','중약','중','중강','강'][this.value]" />
+            <span style="font-size:12px;color:#aaa;">강렬</span>
+            <span class="slider-val" id="acidVal">중</span>
+          </div>
+        </div>
+
+        <hr class="modal-divider" />
+
+        <!-- 온도 -->
+        <div class="opt-group" style="margin-bottom:0">
+          <span class="opt-label">컵 사이즈</span>
+          <div class="opt-chips" id="size">
+            <button class="chip" onclick="select('size',this)">S</button>
+            <button class="chip active" onclick="select('size',this)">M</button>
+            <button class="chip" onclick="select('size',this)">L</button>
+          </div>
+        </div>
+
+        <button class="modal-confirm" onclick="submitOrder()">주문 확정하기</button>
+      </div>
+
+      <!-- 완료 메시지 -->
+      <div class="done-msg" id="doneMsg">
+        <div class="done-icon">☕</div>
+        <p>주문이 접수되었습니다!<br>잠시 후 준비해 드릴게요 😊</p>
+        <button class="modal-confirm" style="margin-top:24px" onclick="closeModal()">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function select(groupId, el) {
+      document.querySelectorAll('#' + groupId + ' .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('orderModal');
+      modal.classList.remove('open');
+      // 폼 초기화
+      setTimeout(() => {
+        document.getElementById('orderForm').style.display = 'block';
+        document.getElementById('doneMsg').style.display = 'none';
+      }, 300);
+    }
+
+    function submitOrder() {
+      document.getElementById('orderForm').style.display = 'none';
+      document.getElementById('doneMsg').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
