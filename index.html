@@ -437,7 +437,7 @@
       header { padding:11px 14px; gap:8px; }
       .header-title { font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .header-right { gap:5px; flex-shrink:0; }
-      #fx-rate, #last-updated, #tg-morning-btn, #tg-preus-btn { display:none; }
+      #fx-rate, #last-updated, #tg-morning-btn, #tg-preus-btn, #api-key-btn { display:none; }
       .icon-btn { font-size:11px; padding:5px 10px; }
       .back-btn { font-size:12px; white-space:nowrap; flex-shrink:0; }
 
@@ -727,9 +727,30 @@
     <span id="last-updated" style="font-size:11px;color:var(--muted);"></span>
     <button class="icon-btn" id="tg-morning-btn" onclick="sendToTelegramMorning()">🌅 모닝</button>
     <button class="icon-btn" id="tg-preus-btn"  onclick="sendToTelegramPreUS()">📈 오후</button>
-    <button class="icon-btn" onclick="openModal()">🔑 API 키</button>
+    <button class="icon-btn" id="api-key-btn" onclick="openModal()">🔑 API 키</button>
+    <button class="icon-btn" id="tg-view-btn" onclick="openTgViewModal()">📨 리포트</button>
   </div>
 </header>
+
+<!-- 텔레그램 리포트 뷰 모달 -->
+<div class="modal-bg" id="tg-view-modal" onclick="if(event.target===this)closeTgViewModal()">
+  <div class="modal" style="max-width:520px;max-height:85vh;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <h2 style="font-size:16px;font-weight:700;">📨 마지막 전송 리포트</h2>
+      <button onclick="closeTgViewModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:2px 6px;">×</button>
+    </div>
+    <!-- 탭 -->
+    <div style="display:flex;gap:6px;margin-bottom:16px;">
+      <button id="tgv-tab-morning" onclick="switchTgViewTab('morning')" style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--accent);color:#fff;border:none;transition:all .2s;">🌅 모닝</button>
+      <button id="tgv-tab-preus"   onclick="switchTgViewTab('preus')"   style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--surface2);color:var(--muted);border:1px solid var(--border);transition:all .2s;">📈 오후</button>
+    </div>
+    <!-- 전송 시각 -->
+    <div id="tgv-sent-time" style="font-size:11px;color:var(--muted);margin-bottom:10px;"></div>
+    <!-- 메시지 내용 -->
+    <div id="tgv-content" style="flex:1;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;font-size:13px;line-height:1.8;white-space:pre-wrap;word-break:break-word;color:var(--text);"></div>
+    <div style="margin-top:14px;font-size:11px;color:var(--muted);text-align:center;">전송된 메시지가 없으면 자동 리포트 후 다시 확인하세요.</div>
+  </div>
+</div>
 
 <!-- Tabs -->
 <div class="tabs">
@@ -1314,7 +1335,8 @@ if (portfolio) {
     return s;
   });
 }
-let prices = {};   // symbol → { price, change, changePct }
+let prices = JSON.parse(localStorage.getItem('stock_prices') || '{}');  // symbol → { price, change, changePct, updatedAt }
+function savePrices() { localStorage.setItem('stock_prices', JSON.stringify(prices)); }
 let newsCache = {};
 let allocPct = {};
 let allocExcluded = new Set(JSON.parse(localStorage.getItem('alloc_excluded') || '[]'));
@@ -1649,16 +1671,16 @@ async function fetchPrice(symbol, storeAs) {
   // 1차: Finnhub (미국 종목, 분당 60회)
   if (finnhubKey && !isKrStock) {
     const q = await fetchFinnhubQuote(symbol);
-    if (q) { prices[key] = q; return; }
+    if (q) { prices[key] = { ...q, updatedAt: Date.now() }; savePrices(); return; }
   }
 
   // 2차: Stooq CSV (무료, 인증 불필요)
   const sq = await fetchStooqPrice(symbol);
-  if (sq) { prices[key] = sq; return; }
+  if (sq) { prices[key] = { ...sq, updatedAt: Date.now() }; savePrices(); return; }
 
   // 3차: Yahoo Finance (폴백)
   const yq = await fetchYahooPrice(symbol);
-  if (yq) { prices[key] = yq; return; }
+  if (yq) { prices[key] = { ...yq, updatedAt: Date.now() }; savePrices(); return; }
 
   // 4차: Alpha Vantage (최후 폴백)
   if (!apiKey) return;
@@ -1673,7 +1695,8 @@ async function fetchPrice(symbol, storeAs) {
     const prevClose = parseFloat(q['08. previous close'] || 0);
     const change    = prevClose > 0 ? price - prevClose : 0;
     const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
-    prices[key] = { price, prevClose, change, changePct };
+    prices[key] = { price, prevClose, change, changePct, updatedAt: Date.now() };
+    savePrices();
   } catch(e) { console.warn('Price fetch error:', symbol, e); }
 }
 
@@ -1760,17 +1783,19 @@ async function refreshPrices() {
 
   refreshing = false;
   if (btn) btn.textContent = '🔄 가격 갱신';
-  document.getElementById('last-updated').textContent = '갱신: ' + new Date().toLocaleTimeString('ko-KR');
+  const lastUpdatedStr = '갱신: ' + new Date().toLocaleString('ko-KR', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  document.getElementById('last-updated').textContent = lastUpdatedStr;
+  localStorage.setItem('stock_last_updated', lastUpdatedStr);
 }
 
 async function fetchKRPrice(symbol) {
   const avSymbol = symbol.includes('.') ? symbol : symbol + '.KS';
   // 1차: Stooq CSV
   const sq = await fetchStooqPrice(avSymbol);
-  if (sq) { prices[symbol] = sq; return; }
+  if (sq) { prices[symbol] = { ...sq, updatedAt: Date.now() }; savePrices(); return; }
   // 2차: Yahoo Finance
   const yq = await fetchYahooPrice(avSymbol);
-  if (yq) { prices[symbol] = yq; return; }
+  if (yq) { prices[symbol] = { ...yq, updatedAt: Date.now() }; savePrices(); return; }
   // 3차: Alpha Vantage 폴백
   return fetchPrice(avSymbol, symbol);
 }
@@ -1843,6 +1868,7 @@ function renderPortfolio() {
       <td>
         ${cur ? fmt(cur, s.currency) : '<span class="neutral">—</span>'}
         ${p ? `<div style="font-size:11px" class="${chgClass}">${p.changePct>=0?'+':''}${p.changePct.toFixed(2)}%</div>` : ''}
+        ${p?.updatedAt ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">${new Date(p.updatedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
       </td>
       <td class="${pnlClass}">
         ${cur ? (pnl>=0?'+':'')+fmt(Math.abs(pnl),s.currency) : '—'}
@@ -3248,6 +3274,8 @@ async function sendToTelegramMorning() {
     });
     const json = await res.json();
     if (json.ok) {
+      localStorage.setItem('tg_last_morning_msg', msg);
+      localStorage.setItem('tg_last_morning_time', new Date().toLocaleString('ko-KR'));
       btn.textContent = '✅ 전송됨';
       setTimeout(() => { btn.textContent = '🌅 모닝'; btn.disabled = false; }, 2500);
     } else {
@@ -3372,6 +3400,8 @@ async function sendToTelegramPreUS() {
     });
     const json = await res.json();
     if (json.ok) {
+      localStorage.setItem('tg_last_preus_msg', msg);
+      localStorage.setItem('tg_last_preus_time', new Date().toLocaleString('ko-KR'));
       btn.textContent = '✅ 전송됨';
       setTimeout(() => { btn.textContent = '📈 오후'; btn.disabled = false; }, 2500);
     } else {
@@ -3410,6 +3440,44 @@ function _tgCheckAndSend() {
 function initTelegramScheduler() {
   _tgCheckAndSend();           // 페이지 로드 즉시 1회 체크 (새로고침 후 복구)
   setInterval(_tgCheckAndSend, 30000); // 이후 30초마다 체크
+}
+
+// ── 텔레그램 리포트 뷰 모달 ────────────────────────────────
+let tgViewTab = 'morning';
+
+function openTgViewModal() {
+  tgViewTab = 'morning';
+  renderTgViewContent();
+  document.getElementById('tg-view-modal').classList.add('open');
+}
+
+function closeTgViewModal() {
+  document.getElementById('tg-view-modal').classList.remove('open');
+}
+
+function switchTgViewTab(tab) {
+  tgViewTab = tab;
+  renderTgViewContent();
+}
+
+function renderTgViewContent() {
+  const morningActive = tgViewTab === 'morning';
+  document.getElementById('tgv-tab-morning').style.cssText =
+    morningActive ? 'flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--accent);color:#fff;border:none;'
+                  : 'flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--surface2);color:var(--muted);border:1px solid var(--border);';
+  document.getElementById('tgv-tab-preus').style.cssText =
+    !morningActive ? 'flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--accent);color:#fff;border:none;'
+                   : 'flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--surface2);color:var(--muted);border:1px solid var(--border);';
+
+  const msgKey  = tgViewTab === 'morning' ? 'tg_last_morning_msg'  : 'tg_last_preus_msg';
+  const timeKey = tgViewTab === 'morning' ? 'tg_last_morning_time' : 'tg_last_preus_time';
+  const rawMsg  = localStorage.getItem(msgKey) || '';
+  const sentAt  = localStorage.getItem(timeKey) || '';
+
+  document.getElementById('tgv-sent-time').textContent = sentAt ? `전송: ${sentAt}` : '아직 전송된 리포트가 없습니다.';
+  // HTML 태그 제거 후 표시 (가독성)
+  const cleanMsg = rawMsg.replace(/<b>(.*?)<\/b>/g, '$1').replace(/<i>(.*?)<\/i>/g, '$1').replace(/<[^>]+>/g, '');
+  document.getElementById('tgv-content').textContent = cleanMsg || '—';
 }
 
 function setScoreStyle(style) {
@@ -4064,6 +4132,10 @@ window.onload = () => {
       prices[sym] = { ...data, prevClose, change, changePct };
     }
   });
+
+  // 마지막 갱신 시간 복원
+  const savedLastUpdated = localStorage.getItem('stock_last_updated');
+  if (savedLastUpdated) document.getElementById('last-updated').textContent = savedLastUpdated;
 
   normalizeAlloc();
   applyAmountsVisibility();
