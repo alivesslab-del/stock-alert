@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>투자 분석 도구 (API)</title>
+  <style>
+    :root {
+      --bg: #0f0f13;
+      --surface: #16161e;
+      --surface2: #1e1e2a;
+      --border: rgba(255,255,255,.08);
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --accent: #7c6aff;
+      --accent2: #a78bfa;
+      --green: #34d399;
+      --red: #f87171;
+      --blue: #60a5fa;
+      --yellow: #fbbf24;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* 헤더 */
+    .header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 16px 28px; display: flex; align-items: center;
+      justify-content: space-between; position: sticky; top: 0; z-index: 100;
+    }
+    .header-title { font-size: 16px; font-weight: 700; color: var(--accent2); }
+    .header-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* API 배너 */
+    .api-banner {
+      background: var(--surface2); border-bottom: 1px solid var(--border);
+      padding: 12px 28px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .api-banner-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .api-input-group { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px; }
+    .api-input-group label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .api-input {
+      flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-size: 12px; padding: 6px 10px; outline: none;
+      font-family: monospace;
+    }
+    .api-input:focus { border-color: var(--accent); }
+    .api-save-btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 6px;
+      padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .api-save-btn:hover { background: var(--accent2); }
+    .api-status { font-size: 11px; color: var(--green); }
+    .api-status.err { color: var(--red); }
+
+    /* 진행 바 */
+    .progress-bar {
+      display: flex; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px; overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .progress-bar::-webkit-scrollbar { display: none; }
+    .step-pill {
+      flex: 1; min-width: 80px; padding: 11px 6px;
+      text-align: center; font-size: 11px; font-weight: 500;
+      color: var(--muted); border-bottom: 2px solid transparent;
+      white-space: nowrap; transition: all .2s;
+    }
+    .step-pill.active { color: var(--accent2); border-bottom-color: var(--accent); }
+    .step-pill.done { color: var(--green); }
+
+    /* 메인 */
+    .main { max-width: 680px; margin: 0 auto; padding: 28px 20px 80px; }
+
+    /* 스텝 */
+    .step { display: none; }
+    .step.active { display: block; }
+
+    .step-title {
+      font-size: 18px; font-weight: 700; color: var(--accent2);
+      margin-bottom: 6px;
+    }
+    .step-desc { font-size: 13px; color: var(--muted); margin-bottom: 24px; line-height: 1.6; }
+
+    /* 섹션 카드 */
+    .section-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px; margin-bottom: 16px;
+    }
+    .section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--muted); margin-bottom: 12px;
+    }
+
+    /* 옵션 버튼 */
+    .option-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .opt-btn {
+      position: relative;
+      padding: 8px 16px; border-radius: 20px; border: 1.5px solid var(--border);
+      background: var(--surface2); color: var(--text); font-size: 13px;
+      font-weight: 500; cursor: pointer; transition: all .15s;
+    }
+    .opt-btn:hover { border-color: var(--accent); color: var(--accent2); }
+    .opt-btn.sel { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .opt-btn.auto-filled::after {
+      content: 'AUTO';
+      position: absolute; top: -6px; right: -6px;
+      background: var(--green); color: #000;
+      font-size: 8px; font-weight: 800; padding: 1px 4px;
+      border-radius: 4px; letter-spacing: .06em;
+    }
+
+    /* 티커 입력 */
+    .ticker-row { display: flex; gap: 8px; align-items: center; }
+    .ticker-input {
+      flex: 1; background: var(--surface2); border: 1.5px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 15px; font-weight: 700;
+      padding: 10px 16px; outline: none; text-transform: uppercase; letter-spacing: .05em;
+    }
+    .ticker-input:focus { border-color: var(--accent); }
+    .fetch-btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 10px;
+      padding: 10px 18px; font-size: 13px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; gap: 6px; white-space: nowrap;
+    }
+    .fetch-btn:hover { background: var(--accent2); }
+    .fetch-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* 스피너 */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 데이터 그리드 */
+    .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }
+    .data-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .data-card-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+    .data-card-value { font-size: 18px; font-weight: 700; color: var(--text); }
+    .data-card-value.good { color: var(--green); }
+    .data-card-value.warn { color: var(--yellow); }
+    .data-card-value.bad { color: var(--red); }
+    .data-card-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    /* 에러/정보 메시지 */
+    .api-msg {
+      font-size: 12px; padding: 10px 14px; border-radius: 8px;
+      margin-top: 12px; line-height: 1.5;
+    }
+    .api-msg.err { background: rgba(248,113,113,.1); color: var(--red); border: 1px solid rgba(248,113,113,.2); }
+    .api-msg.info { background: rgba(96,165,250,.1); color: var(--blue); border: 1px solid rgba(96,165,250,.2); }
+    .api-msg.ok { background: rgba(52,211,153,.1); color: var(--green); border: 1px solid rgba(52,211,153,.2); }
+
+    /* 매크로 결과 박스 */
+    .macro-result {
+      display: none; margin-top: 16px; padding: 16px 20px;
+      border-radius: 12px; border: 1.5px solid var(--border);
+    }
+    .macro-result.show { display: block; }
+    .macro-phase { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+    .macro-action { font-size: 13px; color: var(--muted); line-height: 1.7; }
+    .macro-alloc { font-size: 12px; margin-top: 10px; color: var(--muted); }
+    .macro-alloc span { color: var(--text); font-weight: 600; }
+
+    .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .tag { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+    .tag.g { background: rgba(52,211,153,.15); color: var(--green); }
+    .tag.r { background: rgba(248,113,113,.15); color: var(--red); }
+
+    /* 섹터 선택 */
+    .sector-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+    .sector-btn {
+      position: relative;
+      background: var(--surface2); border: 1.5px solid var(--border);
+      border-radius: 10px; padding: 12px 10px; text-align: center;
+      cursor: pointer; transition: all .15s;
+    }
+    .sector-btn:hover { border-color: var(--accent); }
+    .sector-btn.sel { border-color: var(--accent); background: rgba(124,106,255,.12); }
+    .sector-btn.auto-filled::after {
+      content: 'AUTO';
+      position: absolute; top: -6px; right: -6px;
+      background: var(--green); color: #000;
+      font-size: 8px; font-weight: 800; padding: 1px 4px;
+      border-radius: 4px; letter-spacing: .06em;
+    }
+    .sector-name { font-size: 12px; font-weight: 600; color: var(--text); }
+    .sector-cycle { font-size: 10px; color: var(--muted); margin-top: 3px; }
+    .sector-rating { font-size: 10px; margin-top: 5px; }
+
+    /* 기업 분석 */
+    .metric-compare { display: flex; gap: 6px; align-items: center; margin-top: 6px; font-size: 11px; color: var(--muted); }
+    .metric-compare .val { color: var(--text); font-weight: 600; }
+    .metric-compare .avg { color: var(--muted); }
+    .metric-compare .arrow { font-size: 13px; }
+    .metric-compare .arrow.up { color: var(--green); }
+    .metric-compare .arrow.down { color: var(--red); }
+
+    /* 위험/보상 */
+    .rr-box {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 20px; margin-top: 14px;
+      display: none;
+    }
+    .rr-box.show { display: block; }
+    .rr-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .rr-value { font-size: 22px; font-weight: 800; }
+    .rr-desc { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+    /* 최종 판정 */
+    .verdict-box {
+      border-radius: 16px; padding: 24px; margin-bottom: 20px;
+      text-align: center;
+    }
+    .verdict-box.buy { background: rgba(52,211,153,.1); border: 2px solid var(--green); }
+    .verdict-box.hold { background: rgba(251,191,36,.08); border: 2px solid var(--yellow); }
+    .verdict-box.skip { background: rgba(248,113,113,.1); border: 2px solid var(--red); }
+    .verdict-emoji { font-size: 40px; margin-bottom: 8px; }
+    .verdict-text { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+    .verdict-sub { font-size: 13px; color: var(--muted); }
+
+    .checklist { list-style: none; padding: 0; }
+    .checklist li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; line-height: 1.5; }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist .ck { flex-shrink: 0; font-size: 15px; }
+
+    .premise-box {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 20px; margin-top: 16px;
+    }
+    .premise-title { font-size: 12px; font-weight: 700; color: var(--yellow); margin-bottom: 10px; }
+    .premise-item { font-size: 12px; color: var(--muted); padding: 4px 0; line-height: 1.5; }
+
+    /* 네비게이션 */
+    .nav-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border);
+    }
+    .nav-btn {
+      background: var(--surface2); border: 1.5px solid var(--border);
+      color: var(--text); border-radius: 10px; padding: 11px 22px;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s;
+    }
+    .nav-btn:hover { border-color: var(--accent); color: var(--accent2); }
+    .nav-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .nav-btn.primary:hover { background: var(--accent2); border-color: var(--accent2); }
+    .nav-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    .back-link {
+      color: var(--muted); font-size: 13px; text-decoration: none;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .back-link:hover { color: var(--accent2); }
+
+    @media (max-width: 600px) {
+      .header { padding: 12px 16px; }
+      .api-banner { padding: 10px 16px; }
+      .main { padding: 20px 14px 80px; }
+      .step-title { font-size: 16px; }
+      .sector-grid { grid-template-columns: repeat(3, 1fr); }
+      .api-input-group { min-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="header">
+  <div>
+    <div class="header-title">🧭 투자 분석 도구 <span style="font-size:10px;color:var(--accent);font-weight:600;background:rgba(124,106,255,.15);padding:2px 7px;border-radius:4px;margin-left:6px;">API</span></div>
+    <div class="header-sub">실시간 데이터 기반 5단계 투자 판단</div>
+  </div>
+  <a class="back-link" href="index.html">← 포트폴리오</a>
+</div>
+
+<!-- API 키 배너 -->
+<div class="api-banner">
+  <span class="api-banner-label">🔑 API 설정</span>
+  <div class="api-input-group">
+    <label>Alpha Vantage</label>
+    <input class="api-input" id="av-key" type="password" placeholder="API Key" autocomplete="off">
+  </div>
+  <div class="api-input-group">
+    <label>Finnhub</label>
+    <input class="api-input" id="fh-key" type="password" placeholder="API Key" autocomplete="off">
+  </div>
+  <button class="api-save-btn" onclick="saveKeys()">저장</button>
+  <span class="api-status" id="key-status"></span>
+</div>
+
+<!-- 진행 바 -->
+<div class="progress-bar">
+  <div class="step-pill active" id="pill-1">① 거시환경</div>
+  <div class="step-pill" id="pill-2">② 섹터</div>
+  <div class="step-pill" id="pill-3">③ 기업</div>
+  <div class="step-pill" id="pill-4">④ 차트/리스크</div>
+  <div class="step-pill" id="pill-5">⑤ 최종판정</div>
+</div>
+
+<!-- 메인 -->
+<div class="main">
+
+  <!-- STEP 1: 거시환경 -->
+  <div class="step active" id="step-1">
+    <div class="step-title">① 거시환경 분석</div>
+    <div class="step-desc">현재 금리 사이클과 유동성 상태를 파악합니다.<br>
+      <span style="color:var(--green);font-size:12px;">Alpha Vantage 연동 시 자동 입력됩니다.</span>
+    </div>
+
+    <!-- 자동 불러오기 -->
+    <div class="section-card" style="margin-bottom:16px;">
+      <div class="section-label">🌐 매크로 데이터 자동 불러오기</div>
+      <button class="fetch-btn" id="fetch-macro-btn" onclick="fetchMacro()">
+        <span id="macro-spinner"></span> 데이터 가져오기
+      </button>
+      <div id="macro-fetch-msg"></div>
+      <div class="data-grid" id="macro-data-grid" style="display:none;"></div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">금리 방향</div>
+      <div class="option-row">
+        <button class="opt-btn" id="rate-up" onclick="pick('rate','up')">📈 인상 중</button>
+        <button class="opt-btn" id="rate-peak" onclick="pick('rate','peak')">🔝 고점 유지</button>
+        <button class="opt-btn" id="rate-down" onclick="pick('rate','down')">📉 인하 중</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">시장 유동성</div>
+      <div class="option-row">
+        <button class="opt-btn" id="liq-tight" onclick="pick('liq','tight')">🔒 긴축</button>
+        <button class="opt-btn" id="liq-neutral" onclick="pick('liq','neutral')">⚖️ 중립</button>
+        <button class="opt-btn" id="liq-loose" onclick="pick('liq','loose')">💧 완화</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">장단기 금리차 (10Y-2Y)</div>
+      <div class="option-row">
+        <button class="opt-btn" id="bond-inv" onclick="pick('bond','inv')">🔻 역전</button>
+        <button class="opt-btn" id="bond-flat" onclick="pick('bond','flat')">➡️ 플랫</button>
+        <button class="opt-btn" id="bond-normal" onclick="pick('bond','normal')">🔼 정상</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">인플레이션</div>
+      <div class="option-row">
+        <button class="opt-btn" id="inf-high" onclick="pick('inf','high')">🔥 고인플레 (3%↑)</button>
+        <button class="opt-btn" id="inf-mid" onclick="pick('inf','mid')">🌡️ 중간 (2~3%)</button>
+        <button class="opt-btn" id="inf-low" onclick="pick('inf','low')">❄️ 저인플레 (2%↓)</button>
+      </div>
+    </div>
+
+    <!-- 매크로 판정 결과 -->
+    <div class="macro-result" id="macro-result">
+      <div class="macro-phase" id="macro-phase-text"></div>
+      <div class="macro-action" id="macro-action-text"></div>
+      <div class="tag-row" id="macro-tags"></div>
+      <div class="macro-alloc" id="macro-alloc"></div>
+    </div>
+
+    <div class="nav-bar">
+      <span></span>
+      <button class="nav-btn primary" onclick="goStep(2)">다음 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: 섹터 -->
+  <div class="step" id="step-2">
+    <div class="step-title">② 섹터 분석</div>
+    <div class="step-desc">투자 대상 종목의 섹터를 선택하세요.<br>
+      <span style="color:var(--green);font-size:12px;">티커 입력 시 Finnhub에서 섹터를 자동 감지합니다.</span>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">🔍 티커로 섹터 자동 감지</div>
+      <div class="ticker-row">
+        <input class="ticker-input" id="ticker-input" placeholder="AAPL" maxlength="10">
+        <button class="fetch-btn" id="fetch-sector-btn" onclick="fetchTicker()">
+          <span id="sector-spinner"></span> 조회
+        </button>
+      </div>
+      <div id="sector-fetch-msg"></div>
+      <div id="company-info-box"></div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">섹터 선택</div>
+      <div class="sector-grid" id="sector-grid"></div>
+    </div>
+
+    <div id="sector-detail-box" style="display:none;" class="section-card">
+      <div class="section-label">섹터 특성</div>
+      <div id="sector-detail-text"></div>
+    </div>
+
+    <div class="nav-bar">
+      <button class="nav-btn" onclick="goStep(1)">← 이전</button>
+      <button class="nav-btn primary" onclick="goStep(3)">다음 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: 기업 분석 -->
+  <div class="step" id="step-3">
+    <div class="step-title">③ 기업 펀더멘털</div>
+    <div class="step-desc">핵심 재무 지표를 확인합니다.<br>
+      <span style="color:var(--green);font-size:12px;">티커를 입력하면 Finnhub + Alpha Vantage에서 자동 조회합니다.</span>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">📊 재무 지표 자동 조회</div>
+      <div class="ticker-row">
+        <input class="ticker-input" id="fin-ticker-input" placeholder="AAPL" maxlength="10">
+        <button class="fetch-btn" id="fetch-fin-btn" onclick="fetchFinancials()">
+          <span id="fin-spinner"></span> 조회
+        </button>
+      </div>
+      <div id="fin-fetch-msg"></div>
+      <div class="data-grid" id="fin-data-grid" style="display:none;"></div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">ROE (자기자본이익률)</div>
+      <div class="option-row">
+        <button class="opt-btn" id="roe-high" onclick="pick('roe','high')">🟢 15%↑ 우수</button>
+        <button class="opt-btn" id="roe-mid" onclick="pick('roe','mid')">🟡 10~15% 보통</button>
+        <button class="opt-btn" id="roe-low" onclick="pick('roe','low')">🔴 10%↓ 미흡</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">잉여현금흐름 (FCF)</div>
+      <div class="option-row">
+        <button class="opt-btn" id="fcf-pos" onclick="pick('fcf','pos')">✅ 양호 (흑자)</button>
+        <button class="opt-btn" id="fcf-neg" onclick="pick('fcf','neg')">❌ 적자</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">부채/자본 비율 (D/E)</div>
+      <div class="option-row">
+        <button class="opt-btn" id="de-low" onclick="pick('de','low')">💚 낮음 (~1배)</button>
+        <button class="opt-btn" id="de-mid" onclick="pick('de','mid')">🟡 중간 (1~2배)</button>
+        <button class="opt-btn" id="de-high" onclick="pick('de','high')">🔴 높음 (2배↑)</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">밸류에이션 (PER)</div>
+      <div class="option-row">
+        <button class="opt-btn" id="per-low" onclick="pick('per','low')">💎 저평가 (섹터 평균↓)</button>
+        <button class="opt-btn" id="per-fair" onclick="pick('per','fair')">📊 적정</button>
+        <button class="opt-btn" id="per-high" onclick="pick('per','high')">⚠️ 고평가 (섹터 평균↑)</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">매출 성장률 (YoY)</div>
+      <div class="option-row">
+        <button class="opt-btn" id="rev-high" onclick="pick('rev','high')">🚀 10%↑ 고성장</button>
+        <button class="opt-btn" id="rev-mid" onclick="pick('rev','mid')">📈 0~10% 성장</button>
+        <button class="opt-btn" id="rev-neg" onclick="pick('rev','neg')">📉 역성장</button>
+      </div>
+    </div>
+
+    <div class="nav-bar">
+      <button class="nav-btn" onclick="goStep(2)">← 이전</button>
+      <button class="nav-btn primary" onclick="goStep(4)">다음 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 4: 차트/리스크 -->
+  <div class="step" id="step-4">
+    <div class="step-title">④ 차트 &amp; 리스크</div>
+    <div class="step-desc">기술적 신호와 리스크 요인을 점검합니다.</div>
+
+    <div class="section-card">
+      <div class="section-label">추세 (트렌드)</div>
+      <div class="option-row">
+        <button class="opt-btn" id="trend-up" onclick="pick('trend','up')">📈 상승 추세</button>
+        <button class="opt-btn" id="trend-side" onclick="pick('trend','side')">↔️ 횡보</button>
+        <button class="opt-btn" id="trend-down" onclick="pick('trend','down')">📉 하락 추세</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">거래량 확인</div>
+      <div class="option-row">
+        <button class="opt-btn" id="vol-up" onclick="pick('vol','up')">🔊 거래량 증가 + 상승</button>
+        <button class="opt-btn" id="vol-low" onclick="pick('vol','low')">🔇 거래량 감소</button>
+        <button class="opt-btn" id="vol-down" onclick="pick('vol','down')">⚠️ 거래량 증가 + 하락</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">이동평균선 위치</div>
+      <div class="option-row">
+        <button class="opt-btn" id="ma-above" onclick="pick('ma','above')">✅ 20·60MA 위</button>
+        <button class="opt-btn" id="ma-cross" onclick="pick('ma','cross')">⚡ 골든크로스 근접</button>
+        <button class="opt-btn" id="ma-below" onclick="pick('ma','below')">❌ MA 아래</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">헤지/리스크</div>
+      <div class="option-row">
+        <button class="opt-btn" id="hg-none" onclick="pick('hg','none')">✅ 특이사항 없음</button>
+        <button class="opt-btn" id="hg-macro" onclick="pick('hg','macro')">🌏 매크로 리스크</button>
+        <button class="opt-btn" id="hg-reg" onclick="pick('hg','reg')">⚖️ 규제 리스크</button>
+        <button class="opt-btn" id="hg-earn" onclick="pick('hg','earn')">📋 실적 불확실성</button>
+      </div>
+    </div>
+
+    <!-- 리스크/보상 계산 -->
+    <div class="section-card">
+      <div class="section-label">목표가 / 손절가</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:120px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">현재가</div>
+          <input id="price-cur" type="number" class="ticker-input" placeholder="100" style="font-size:14px;font-weight:600;">
+        </div>
+        <div style="flex:1;min-width:120px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">목표가 (TP)</div>
+          <input id="price-tp" type="number" class="ticker-input" placeholder="130" style="font-size:14px;font-weight:600;">
+        </div>
+        <div style="flex:1;min-width:120px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">손절가 (SL)</div>
+          <input id="price-sl" type="number" class="ticker-input" placeholder="90" style="font-size:14px;font-weight:600;">
+        </div>
+      </div>
+      <button class="fetch-btn" style="margin-top:12px;" onclick="calcRisk()">R/R 계산</button>
+      <div class="rr-box" id="rr-box">
+        <div class="rr-label">리스크/보상 비율</div>
+        <div class="rr-value" id="rr-value"></div>
+        <div class="rr-desc" id="rr-desc"></div>
+      </div>
+    </div>
+
+    <div class="nav-bar">
+      <button class="nav-btn" onclick="goStep(3)">← 이전</button>
+      <button class="nav-btn primary" onclick="goStep(5)">최종 판정 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 5: 최종 판정 -->
+  <div class="step" id="step-5">
+    <div class="step-title">⑤ 최종 투자 판단</div>
+    <div class="step-desc">입력하신 정보를 종합한 투자 판단 결과입니다.</div>
+    <div id="final-content"></div>
+    <div class="nav-bar">
+      <button class="nav-btn" onclick="goStep(4)">← 이전</button>
+      <button class="nav-btn" onclick="resetAll()" style="color:var(--muted);">🔄 다시 분석</button>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────
+// API Keys
+// ─────────────────────────────────────────────
+let AV_KEY = '', FH_KEY = '';
+
+function loadKeys() {
+  AV_KEY = localStorage.getItem('av_key') || '';
+  FH_KEY = localStorage.getItem('fh_key') || '';
+  if (AV_KEY) document.getElementById('av-key').value = AV_KEY;
+  if (FH_KEY) document.getElementById('fh-key').value = FH_KEY;
+  if (AV_KEY && FH_KEY) showKeyStatus('API 키 로드됨', false);
+}
+
+function saveKeys() {
+  AV_KEY = document.getElementById('av-key').value.trim();
+  FH_KEY = document.getElementById('fh-key').value.trim();
+  if (!AV_KEY && !FH_KEY) { showKeyStatus('키를 입력해주세요', true); return; }
+  if (AV_KEY) localStorage.setItem('av_key', AV_KEY);
+  if (FH_KEY) localStorage.setItem('fh_key', FH_KEY);
+  showKeyStatus('저장 완료 ✓', false);
+}
+
+function showKeyStatus(msg, isErr) {
+  const el = document.getElementById('key-status');
+  el.textContent = msg;
+  el.className = 'api-status' + (isErr ? ' err' : '');
+  setTimeout(() => el.textContent = '', 3000);
+}
+
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+const S = {
+  rate: null, liq: null, bond: null, inf: null,
+  sector: null,
+  roe: null, fcf: null, de: null, per: null, rev: null,
+  trend: null, vol: null, ma: null, hg: null,
+  ticker: '',
+  sectorAvgROE: null, sectorAvgPER: null
+};
+
+// ─────────────────────────────────────────────
+// Step navigation
+// ─────────────────────────────────────────────
+let currentStep = 1;
+
+function goStep(n) {
+  document.getElementById('step-' + currentStep).classList.remove('active');
+  document.getElementById('pill-' + currentStep).classList.remove('active');
+  document.getElementById('pill-' + currentStep).classList.add('done');
+  currentStep = n;
+  document.getElementById('step-' + n).classList.add('active');
+  for (let i = 1; i <= 5; i++) {
+    const pill = document.getElementById('pill-' + i);
+    pill.classList.remove('active');
+    if (i < n) pill.classList.add('done');
+  }
+  document.getElementById('pill-' + n).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (n === 5) buildFinal();
+  if (n === 2) buildSectorGrid();
+  // sync ticker inputs
+  const t = S.ticker;
+  if (t) {
+    const si = document.getElementById('ticker-input');
+    const fi = document.getElementById('fin-ticker-input');
+    if (si && !si.value) si.value = t;
+    if (fi && !fi.value) fi.value = t;
+  }
+}
+
+// ─────────────────────────────────────────────
+// Generic pick
+// ─────────────────────────────────────────────
+function pick(key, val) {
+  S[key] = val;
+  // find all buttons for this key
+  document.querySelectorAll('[id^="' + key + '-"]').forEach(b => {
+    b.classList.remove('sel');
+    // don't remove auto-filled badge on manual click — remove it
+    b.classList.remove('auto-filled');
+  });
+  const btn = document.getElementById(key + '-' + val);
+  if (btn) btn.classList.add('sel');
+  if (['rate','liq','bond','inf'].includes(key)) updateMacroResult();
+}
+
+// ─────────────────────────────────────────────
+// STEP 1: 매크로 자동 불러오기 (Alpha Vantage)
+// ─────────────────────────────────────────────
+async function fetchMacro() {
+  if (!AV_KEY) {
+    setMsg('macro-fetch-msg', '⚠️ Alpha Vantage API 키를 먼저 저장해주세요.', 'err');
+    return;
+  }
+  const btn = document.getElementById('fetch-macro-btn');
+  btn.disabled = true;
+  document.getElementById('macro-spinner').innerHTML = '<span class="spinner"></span>';
+  setMsg('macro-fetch-msg', '데이터 불러오는 중...', 'info');
+  document.getElementById('macro-data-grid').style.display = 'none';
+
+  const base = 'https://www.alphavantage.co/query';
+
+  try {
+    const [fedRes, t10Res, t2Res, cpiRes] = await Promise.all([
+      fetch(`${base}?function=FEDERAL_FUNDS_RATE&interval=monthly&apikey=${AV_KEY}`).then(r=>r.json()),
+      fetch(`${base}?function=TREASURY_YIELD&interval=monthly&maturity=10year&apikey=${AV_KEY}`).then(r=>r.json()),
+      fetch(`${base}?function=TREASURY_YIELD&interval=monthly&maturity=2year&apikey=${AV_KEY}`).then(r=>r.json()),
+      fetch(`${base}?function=CPI&interval=monthly&apikey=${AV_KEY}`).then(r=>r.json()),
+    ]);
+
+    const fedRate = latestVal(fedRes);
+    const t10 = latestVal(t10Res);
+    const t2 = latestVal(t2Res);
+    const cpi = latestCpiYoy(cpiRes);
+
+    if (fedRate === null) { setMsg('macro-fetch-msg', '❌ 연준 금리 데이터 조회 실패. API 키와 한도를 확인해주세요.', 'err'); return; }
+
+    // spread
+    const spread = (t10 !== null && t2 !== null) ? (t10 - t2) : null;
+
+    // 데이터 카드 표시
+    const grid = document.getElementById('macro-data-grid');
+    grid.style.display = 'grid';
+    grid.innerHTML = `
+      <div class="data-card">
+        <div class="data-card-label">연방기금금리</div>
+        <div class="data-card-value">${fedRate.toFixed(2)}%</div>
+        <div class="data-card-sub">Federal Funds Rate</div>
+      </div>
+      ${t10 !== null ? `<div class="data-card">
+        <div class="data-card-label">미국채 10년</div>
+        <div class="data-card-value">${t10.toFixed(2)}%</div>
+        <div class="data-card-sub">10Y Treasury Yield</div>
+      </div>` : ''}
+      ${t2 !== null ? `<div class="data-card">
+        <div class="data-card-label">미국채 2년</div>
+        <div class="data-card-value">${t2.toFixed(2)}%</div>
+        <div class="data-card-sub">2Y Treasury Yield</div>
+      </div>` : ''}
+      ${spread !== null ? `<div class="data-card">
+        <div class="data-card-label">장단기 스프레드</div>
+        <div class="data-card-value ${spread < 0 ? 'bad' : spread < 0.5 ? 'warn' : 'good'}">${spread >= 0 ? '+' : ''}${spread.toFixed(2)}%</div>
+        <div class="data-card-sub">10Y - 2Y</div>
+      </div>` : ''}
+      ${cpi !== null ? `<div class="data-card">
+        <div class="data-card-label">CPI (YoY)</div>
+        <div class="data-card-value ${cpi > 3 ? 'bad' : cpi > 2 ? 'warn' : 'good'}">${cpi.toFixed(1)}%</div>
+        <div class="data-card-sub">소비자물가지수</div>
+      </div>` : ''}
+    `;
+
+    // 자동 선택 (금리 방향)
+    // 연준 금리 변화로 방향 추정 — 과거 2개 비교
+    const fedHistory = fedRes.data ? fedRes.data.slice(0, 3).map(d => parseFloat(d.value)).filter(v => !isNaN(v)) : [];
+    let rateDir = 'peak';
+    if (fedHistory.length >= 2) {
+      const diff = fedHistory[0] - fedHistory[1];
+      if (diff > 0.05) rateDir = 'up';
+      else if (diff < -0.05) rateDir = 'down';
+      else rateDir = 'peak';
+    }
+    autoPickBtn('rate', rateDir);
+
+    // 유동성 — 금리 5% 이상이면 긴축
+    let liqDir = 'neutral';
+    if (fedRate >= 4.5) liqDir = 'tight';
+    else if (fedRate <= 2) liqDir = 'loose';
+    autoPickBtn('liq', liqDir);
+
+    // 장단기
+    if (spread !== null) {
+      let bondDir = 'normal';
+      if (spread < 0) bondDir = 'inv';
+      else if (spread < 0.5) bondDir = 'flat';
+      autoPickBtn('bond', bondDir);
+    }
+
+    // CPI
+    if (cpi !== null) {
+      let infDir = 'mid';
+      if (cpi > 3) infDir = 'high';
+      else if (cpi < 2) infDir = 'low';
+      autoPickBtn('inf', infDir);
+    }
+
+    updateMacroResult();
+    setMsg('macro-fetch-msg', '✅ 실시간 데이터 자동 입력 완료', 'ok');
+
+  } catch(e) {
+    setMsg('macro-fetch-msg', '❌ 네트워크 오류: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('macro-spinner').innerHTML = '';
+  }
+}
+
+function latestVal(res) {
+  if (!res || !res.data || !res.data.length) return null;
+  const v = parseFloat(res.data[0].value);
+  return isNaN(v) ? null : v;
+}
+
+function latestCpiYoy(res) {
+  if (!res || !res.data || res.data.length < 13) return null;
+  const latest = parseFloat(res.data[0].value);
+  const yearAgo = parseFloat(res.data[12].value);
+  if (isNaN(latest) || isNaN(yearAgo) || yearAgo === 0) return null;
+  return ((latest - yearAgo) / yearAgo) * 100;
+}
+
+function autoPickBtn(key, val) {
+  // remove sel from all
+  document.querySelectorAll('[id^="' + key + '-"]').forEach(b => {
+    b.classList.remove('sel', 'auto-filled');
+  });
+  const btn = document.getElementById(key + '-' + val);
+  if (btn) { btn.classList.add('sel', 'auto-filled'); }
+  S[key] = val;
+}
+
+// ─────────────────────────────────────────────
+// STEP 1: 매크로 판정
+// ─────────────────────────────────────────────
+const MACRO_PHASES = [
+  { min: 8, phase: '🟢 강세장 진입', cls: 'buy', action: '위험 자산 비중 확대 구간. 성장주·주식 비중을 높이되 분할 매수로 대응하세요.', good: ['성장주','IT','반도체','소비재'], bad: ['채권','리츠','유틸리티'], alloc: '주식 70% / 채권 15% / 현금 15%' },
+  { min: 5, phase: '🟡 중립 — 선별 매수', cls: 'hold', action: '매크로가 혼재됩니다. 고퀄리티 기업 위주 선별 매수, 비중은 중립 유지.', good: ['퀄리티 성장','배당주'], bad: ['고레버리지 기업'], alloc: '주식 50% / 채권 30% / 현금 20%' },
+  { min: 0, phase: '🔴 방어적 포지션', cls: 'skip', action: '리스크 관리 최우선. 현금 비중 확대, 방어 섹터 집중.', good: ['헬스케어','필수소비재','유틸리티'], bad: ['성장주','고PER 기술주'], alloc: '주식 30% / 채권 40% / 현금 30%' },
+];
+
+function macroScore() {
+  let score = 0;
+  if (S.rate === 'down') score += 3; else if (S.rate === 'peak') score += 1;
+  if (S.liq === 'loose') score += 2; else if (S.liq === 'neutral') score += 1;
+  if (S.bond === 'normal') score += 2; else if (S.bond === 'flat') score += 1;
+  if (S.inf === 'low') score += 2; else if (S.inf === 'mid') score += 1;
+  return score;
+}
+
+function updateMacroResult() {
+  if (!S.rate || !S.liq || !S.bond || !S.inf) return;
+  const score = macroScore();
+  const phase = MACRO_PHASES.find(p => score >= p.min);
+  const box = document.getElementById('macro-result');
+  box.className = 'macro-result show';
+  box.style.borderColor = phase.cls === 'buy' ? 'var(--green)' : phase.cls === 'hold' ? 'var(--yellow)' : 'var(--red)';
+  document.getElementById('macro-phase-text').textContent = phase.phase;
+  document.getElementById('macro-action-text').textContent = phase.action;
+  document.getElementById('macro-alloc').innerHTML = `자산 배분 제안: <span>${phase.alloc}</span>`;
+  const tags = document.getElementById('macro-tags');
+  tags.innerHTML = phase.good.map(t => `<span class="tag g">${t}</span>`).join('') +
+                   phase.bad.map(t => `<span class="tag r">${t}</span>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// STEP 2: 섹터
+// ─────────────────────────────────────────────
+const SECTOR_MAP = {
+  // Finnhub industry → 한국어 섹터명
+  'Technology': 'IT/반도체',
+  'Semiconductors': 'IT/반도체',
+  'Software': 'IT/반도체',
+  'Communication Services': '통신',
+  'Internet Content & Information': '통신',
+  'Financial Services': '금융',
+  'Banks': '금융',
+  'Insurance': '금융',
+  'Consumer Cyclical': '소비재(경기민감)',
+  'Consumer Defensive': '필수소비재',
+  'Healthcare': '헬스케어',
+  'Biotechnology': '헬스케어',
+  'Pharmaceuticals': '헬스케어',
+  'Energy': '에너지',
+  'Oil & Gas': '에너지',
+  'Utilities': '유틸리티',
+  'Real Estate': '리츠/부동산',
+  'Industrials': '산업재',
+  'Basic Materials': '소재',
+  'Consumer Electronics': 'IT/반도체',
+  'Electronic Components': 'IT/반도체',
+  'Aerospace & Defense': '방산/우주',
+};
+
+const SECTOR = {
+  'IT/반도체':      { up:'🔴 약세', peak:'🟡 보통', down:'🟢 강세', desc:'금리 하락·유동성 완화 구간에서 가장 강세. PER 민감도 높아 고금리 시 밸류 압박.', avgROE: 28, avgPER: 30 },
+  '통신':           { up:'🟡 중립', peak:'🟢 방어적', down:'🟡 중립', desc:'배당 안정성 높아 금리 고점 구간에서 방어적 역할. 성장성은 낮음.', avgROE: 14, avgPER: 17 },
+  '금융':           { up:'🟢 강세', peak:'🟢 강세', down:'🔴 약세', desc:'금리 인상기 순이자마진 확대로 수혜. 인하기엔 마진 축소 압박.', avgROE: 12, avgPER: 13 },
+  '소비재(경기민감)': { up:'🔴 약세', peak:'🟡 보통', down:'🟢 강세', desc:'경기·소비심리에 민감. 금리 하락으로 소비 회복 기대 시 강세.', avgROE: 18, avgPER: 22 },
+  '필수소비재':     { up:'🟢 방어적', peak:'🟡 보통', down:'🟡 보통', desc:'경기 방어적. 어떤 금리 사이클에서도 안정적이나 상승 탄력 제한.', avgROE: 22, avgPER: 20 },
+  '헬스케어':       { up:'🟢 방어적', peak:'🟢 방어적', down:'🟡 보통', desc:'금리 환경에 비교적 독립적. 고령화·혁신 테마로 장기 성장성 보유.', avgROE: 18, avgPER: 24 },
+  '에너지':         { up:'🟡 보통', peak:'🟡 보통', down:'🟡 보통', desc:'유가·지정학 변수가 더 크게 작용. 고물가 시 인플레 헤지 역할.', avgROE: 15, avgPER: 12 },
+  '유틸리티':       { up:'🔴 약세', peak:'🟢 방어적', down:'🟢 강세', desc:'채권 대체재 성격. 금리 하락 시 배당 매력 부각. 인상기엔 상대적 약세.', avgROE: 11, avgPER: 18 },
+  '리츠/부동산':    { up:'🔴 약세', peak:'🟡 중립', down:'🟢 강세', desc:'금리에 가장 민감한 자산군. 부채 비용 직접 영향. 인하기엔 큰 수혜.', avgROE: 8, avgPER: 30 },
+  '산업재':         { up:'🟡 보통', peak:'🟡 보통', down:'🟢 강세', desc:'경기 확장·인프라 투자 수혜. 방산·항공 테마 포함.', avgROE: 17, avgPER: 20 },
+  '소재':           { up:'🟡 중립', peak:'🟡 중립', down:'🟢 강세', desc:'원자재 가격과 경기 사이클 연동. 인플레·달러 약세 구간 수혜.', avgROE: 14, avgPER: 16 },
+  '방산/우주':      { up:'🟢 강세', peak:'🟢 강세', down:'🟡 보통', desc:'지정학 리스크와 국방 예산 확대 수혜. 금리 사이클 독립적.', avgROE: 25, avgPER: 22 },
+  '바이오':         { up:'🔴 약세', peak:'🟡 보통', down:'🟢 강세', desc:'고금리 시 적자 바이오 밸류 급락. 인하기엔 임상 파이프라인 재평가.', avgROE: -5, avgPER: 45 },
+};
+
+function buildSectorGrid() {
+  const grid = document.getElementById('sector-grid');
+  const rateKey = S.rate === 'up' ? 'up' : S.rate === 'down' ? 'down' : 'peak';
+  grid.innerHTML = Object.entries(SECTOR).map(([name, d]) => `
+    <div class="sector-btn ${S.sector === name ? 'sel' : ''}" id="sec-${name}" onclick="pickSector('${name}')">
+      <div class="sector-name">${name}</div>
+      <div class="sector-rating">${d[rateKey]}</div>
+    </div>
+  `).join('');
+}
+
+function pickSector(name) {
+  S.sector = name;
+  document.querySelectorAll('.sector-btn').forEach(b => {
+    b.classList.remove('sel', 'auto-filled');
+  });
+  const btn = document.getElementById('sec-' + name);
+  if (btn) btn.classList.add('sel');
+  afterSectorPick(name);
+}
+
+function afterSectorPick(name) {
+  const d = SECTOR[name];
+  if (!d) return;
+  const box = document.getElementById('sector-detail-box');
+  box.style.display = 'block';
+  const rateKey = S.rate === 'up' ? 'up' : S.rate === 'down' ? 'down' : 'peak';
+  document.getElementById('sector-detail-text').innerHTML = `
+    <div style="font-size:13px;line-height:1.7;color:var(--muted);">${d.desc}</div>
+    <div style="margin-top:10px;font-size:12px;color:var(--muted);">현재 금리 환경: <span style="color:var(--text);font-weight:600;">${d[rateKey]}</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;">섹터 평균 ROE: <span style="color:var(--text);font-weight:600;">${d.avgROE}%</span> &nbsp;|&nbsp; 섹터 평균 PER: <span style="color:var(--text);font-weight:600;">${d.avgPER}x</span></div>
+  `;
+  S.sectorAvgROE = d.avgROE;
+  S.sectorAvgPER = d.avgPER;
+}
+
+// ─────────────────────────────────────────────
+// STEP 2: Finnhub 티커 조회
+// ─────────────────────────────────────────────
+async function fetchTicker() {
+  const ticker = document.getElementById('ticker-input').value.trim().toUpperCase();
+  if (!ticker) { setMsg('sector-fetch-msg', '티커를 입력해주세요.', 'err'); return; }
+  if (!FH_KEY) { setMsg('sector-fetch-msg', '⚠️ Finnhub API 키를 먼저 저장해주세요.', 'err'); return; }
+
+  S.ticker = ticker;
+  document.getElementById('fin-ticker-input').value = ticker;
+
+  const btn = document.getElementById('fetch-sector-btn');
+  btn.disabled = true;
+  document.getElementById('sector-spinner').innerHTML = '<span class="spinner"></span>';
+  setMsg('sector-fetch-msg', '조회 중...', 'info');
+
+  try {
+    const res = await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FH_KEY}`).then(r=>r.json());
+
+    if (!res || !res.name) {
+      setMsg('sector-fetch-msg', `❌ '${ticker}' 종목 정보를 찾을 수 없습니다.`, 'err');
+      return;
+    }
+
+    // 기업 정보 표시
+    document.getElementById('company-info-box').innerHTML = `
+      <div class="data-grid" style="margin-top:12px;">
+        <div class="data-card"><div class="data-card-label">기업명</div><div class="data-card-value" style="font-size:14px;">${res.name}</div></div>
+        <div class="data-card"><div class="data-card-label">국가</div><div class="data-card-value" style="font-size:14px;">${res.country || '-'}</div></div>
+        <div class="data-card"><div class="data-card-label">산업</div><div class="data-card-value" style="font-size:14px;">${res.finnhubIndustry || '-'}</div></div>
+        ${res.marketCapitalization ? `<div class="data-card"><div class="data-card-label">시가총액</div><div class="data-card-value" style="font-size:14px;">$${formatNum(res.marketCapitalization)}M</div></div>` : ''}
+      </div>
+    `;
+
+    // 섹터 자동 매핑
+    const industry = res.finnhubIndustry || '';
+    const mappedSector = SECTOR_MAP[industry] || null;
+
+    if (mappedSector && SECTOR[mappedSector]) {
+      // rebuild grid first
+      buildSectorGrid();
+      // mark auto
+      const btn2 = document.getElementById('sec-' + mappedSector);
+      if (btn2) { btn2.classList.add('sel', 'auto-filled'); }
+      S.sector = mappedSector;
+      afterSectorPick(mappedSector);
+      setMsg('sector-fetch-msg', `✅ 섹터 자동 감지: ${mappedSector}`, 'ok');
+    } else {
+      buildSectorGrid();
+      setMsg('sector-fetch-msg', `⚠️ '${industry}' 섹터를 자동 매핑하지 못했습니다. 직접 선택해주세요.`, 'info');
+    }
+
+  } catch(e) {
+    setMsg('sector-fetch-msg', '❌ 오류: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('sector-spinner').innerHTML = '';
+  }
+}
+
+// ─────────────────────────────────────────────
+// STEP 3: 재무 지표 자동 조회
+// ─────────────────────────────────────────────
+async function fetchFinancials() {
+  const ticker = document.getElementById('fin-ticker-input').value.trim().toUpperCase();
+  if (!ticker) { setMsg('fin-fetch-msg', '티커를 입력해주세요.', 'err'); return; }
+  if (!FH_KEY && !AV_KEY) { setMsg('fin-fetch-msg', '⚠️ API 키를 먼저 저장해주세요.', 'err'); return; }
+
+  S.ticker = ticker;
+  document.getElementById('ticker-input').value = ticker;
+
+  const btn = document.getElementById('fetch-fin-btn');
+  btn.disabled = true;
+  document.getElementById('fin-spinner').innerHTML = '<span class="spinner"></span>';
+  setMsg('fin-fetch-msg', '재무 데이터 조회 중...', 'info');
+  document.getElementById('fin-data-grid').style.display = 'none';
+
+  try {
+    const promises = [];
+    if (FH_KEY) promises.push(fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FH_KEY}`).then(r=>r.json()));
+    else promises.push(Promise.resolve(null));
+
+    if (AV_KEY) promises.push(fetch(`https://www.alphavantage.co/query?function=OVERVIEW&symbol=${ticker}&apikey=${AV_KEY}`).then(r=>r.json()));
+    else promises.push(Promise.resolve(null));
+
+    const [fhData, avData] = await Promise.all(promises);
+
+    const m = fhData?.metric || {};
+    const av = avData || {};
+
+    // 지표 추출
+    const roe = m['roeTTM'] ?? (av['ReturnOnEquityTTM'] ? parseFloat(av['ReturnOnEquityTTM']) * 100 : null);
+    const per = m['peNormalizedAnnual'] ?? (av['PERatio'] ? parseFloat(av['PERatio']) : null);
+    const pb  = m['pbAnnual'] ?? null;
+    const fcf = m['freeCashFlowTTM'] ?? null;
+    const de  = m['totalDebt/totalEquityAnnual'] ?? null;
+    const revGrowth = m['revenueGrowthTTMYoy'] ?? null;
+    const eps = m['epsTTM'] ?? (av['EPS'] ? parseFloat(av['EPS']) : null);
+    const divYield = m['dividendYieldIndicatedAnnual'] ?? null;
+
+    // 데이터 카드 표시
+    const grid = document.getElementById('fin-data-grid');
+    grid.style.display = 'grid';
+    grid.innerHTML = [
+      roe !== null ? dataCard('ROE', roe.toFixed(1) + '%', roe >= 15 ? 'good' : roe >= 10 ? 'warn' : 'bad', 'Return on Equity') : '',
+      per !== null ? dataCard('PER', per.toFixed(1) + 'x', per <= 15 ? 'good' : per <= 30 ? 'warn' : 'bad', 'Price/Earnings') : '',
+      pb !== null ? dataCard('PBR', pb.toFixed(1) + 'x', pb <= 2 ? 'good' : pb <= 4 ? 'warn' : 'bad', 'Price/Book') : '',
+      de !== null ? dataCard('D/E', de.toFixed(1) + 'x', de <= 1 ? 'good' : de <= 2 ? 'warn' : 'bad', 'Debt/Equity') : '',
+      fcf !== null ? dataCard('FCF', formatBig(fcf), fcf > 0 ? 'good' : 'bad', 'Free Cash Flow (TTM)') : '',
+      revGrowth !== null ? dataCard('매출성장', (revGrowth * 100).toFixed(1) + '%', revGrowth > 0.1 ? 'good' : revGrowth > 0 ? 'warn' : 'bad', 'Revenue Growth YoY') : '',
+      eps !== null ? dataCard('EPS', '$' + eps.toFixed(2), eps > 0 ? 'good' : 'bad', 'Earnings Per Share') : '',
+      divYield ? dataCard('배당수익률', (divYield * 100).toFixed(2) + '%', 'warn', 'Dividend Yield') : '',
+    ].filter(Boolean).join('');
+
+    // 섹터 평균 비교 및 자동 선택
+    const avgROE = S.sectorAvgROE;
+    const avgPER = S.sectorAvgPER;
+
+    // ROE 자동 선택
+    if (roe !== null) {
+      let roeVal = roe >= 15 ? 'high' : roe >= 10 ? 'mid' : 'low';
+      autoPickBtn('roe', roeVal);
+    }
+
+    // FCF 자동 선택
+    if (fcf !== null) autoPickBtn('fcf', fcf > 0 ? 'pos' : 'neg');
+
+    // D/E 자동 선택
+    if (de !== null) {
+      let deVal = de <= 1 ? 'low' : de <= 2 ? 'mid' : 'high';
+      autoPickBtn('de', deVal);
+    }
+
+    // PER 자동 선택 (섹터 평균 비교)
+    if (per !== null) {
+      let perVal = 'fair';
+      if (avgPER && per < avgPER * 0.85) perVal = 'low';
+      else if (avgPER && per > avgPER * 1.15) perVal = 'high';
+      else if (!avgPER && per < 15) perVal = 'low';
+      else if (!avgPER && per > 30) perVal = 'high';
+      autoPickBtn('per', perVal);
+    }
+
+    // 매출성장 자동 선택
+    if (revGrowth !== null) {
+      let revVal = revGrowth > 0.1 ? 'high' : revGrowth >= 0 ? 'mid' : 'neg';
+      autoPickBtn('rev', revVal);
+    }
+
+    // 섹터 평균 비교 정보 표시
+    let compareHtml = '';
+    if (avgROE && roe !== null) {
+      const arrow = roe >= avgROE ? '▲' : '▼';
+      const cls = roe >= avgROE ? 'up' : 'down';
+      compareHtml += `<div class="metric-compare">ROE: <span class="val">${roe.toFixed(1)}%</span> <span class="arrow ${cls}">${arrow}</span> <span class="avg">섹터 평균 ${avgROE}%</span></div>`;
+    }
+    if (avgPER && per !== null) {
+      const arrow = per <= avgPER ? '▼' : '▲';
+      const cls = per <= avgPER ? 'up' : 'down';
+      compareHtml += `<div class="metric-compare">PER: <span class="val">${per.toFixed(1)}x</span> <span class="arrow ${cls}">${arrow}</span> <span class="avg">섹터 평균 ${avgPER}x</span></div>`;
+    }
+    if (compareHtml) {
+      grid.innerHTML += `<div class="data-card" style="grid-column:1/-1;background:rgba(124,106,255,.08);border-color:rgba(124,106,255,.2);">
+        <div class="data-card-label">섹터 대비 비교</div>${compareHtml}</div>`;
+    }
+
+    setMsg('fin-fetch-msg', '✅ 재무 지표 자동 입력 완료', 'ok');
+
+  } catch(e) {
+    setMsg('fin-fetch-msg', '❌ 오류: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('fin-spinner').innerHTML = '';
+  }
+}
+
+function dataCard(label, value, cls, sub) {
+  return `<div class="data-card"><div class="data-card-label">${label}</div><div class="data-card-value ${cls}">${value}</div><div class="data-card-sub">${sub}</div></div>`;
+}
+
+// ─────────────────────────────────────────────
+// STEP 4: 리스크/보상 계산
+// ─────────────────────────────────────────────
+function calcRisk() {
+  const cur = parseFloat(document.getElementById('price-cur').value);
+  const tp  = parseFloat(document.getElementById('price-tp').value);
+  const sl  = parseFloat(document.getElementById('price-sl').value);
+  const box = document.getElementById('rr-box');
+
+  if (isNaN(cur) || isNaN(tp) || isNaN(sl)) {
+    box.classList.remove('show'); return;
+  }
+  const reward = tp - cur;
+  const risk = cur - sl;
+  if (risk <= 0) { box.classList.remove('show'); return; }
+
+  const rr = reward / risk;
+  box.classList.add('show');
+  const rrEl = document.getElementById('rr-value');
+  rrEl.textContent = '1 : ' + rr.toFixed(2);
+  rrEl.className = 'rr-value ' + (rr >= 2 ? 'good' : rr >= 1 ? 'warn' : 'bad');
+
+  let desc = '';
+  if (rr >= 3) desc = '✅ 훌륭한 리스크/보상 비율입니다. 적극 검토 가능.';
+  else if (rr >= 2) desc = '🟡 적정 수준의 R/R입니다. 매수 검토 가능.';
+  else if (rr >= 1) desc = '⚠️ R/R이 다소 낮습니다. 손절가 조정 또는 목표가 재검토를 권장합니다.';
+  else desc = '🔴 리스크가 보상보다 큽니다. 매수를 재고하세요.';
+
+  desc += `<br><span style="font-size:11px;margin-top:4px;display:block;">수익: +${((reward/cur)*100).toFixed(1)}% | 손실: -${((risk/cur)*100).toFixed(1)}%</span>`;
+  document.getElementById('rr-desc').innerHTML = desc;
+}
+
+// ─────────────────────────────────────────────
+// STEP 5: 최종 판정
+// ─────────────────────────────────────────────
+function buildFinal() {
+  const score = calcFinalScore();
+  let verdict, cls, emoji, sub;
+
+  if (score >= 12) { verdict = '매수 검토'; cls = 'buy'; emoji = '✅'; sub = '대부분의 조건이 충족되었습니다. 분할 매수를 검토하세요.'; }
+  else if (score >= 7) { verdict = '보류 — 추가 확인'; cls = 'hold'; emoji = '⏳'; sub = '일부 조건이 미흡합니다. 조건 개선 후 재검토하세요.'; }
+  else { verdict = '매수 제외'; cls = 'skip'; emoji = '❌'; sub = '현재 조건에서는 매수를 권장하지 않습니다.'; }
+
+  const checklist = buildChecklist();
+  const premise = buildPremise();
+  const tickerLabel = S.ticker ? ` — ${S.ticker}` : '';
+
+  document.getElementById('final-content').innerHTML = `
+    <div class="verdict-box ${cls}">
+      <div class="verdict-emoji">${emoji}</div>
+      <div class="verdict-text">${verdict}${tickerLabel}</div>
+      <div class="verdict-sub">${sub}</div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);">종합 점수: <span style="color:var(--text);font-weight:700;">${score}/18점</span></div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">체크리스트</div>
+      <ul class="checklist">${checklist}</ul>
+    </div>
+
+    ${premise}
+  `;
+}
+
+function calcFinalScore() {
+  let s = 0;
+  // 매크로 (최대 4)
+  if (S.rate === 'down') s += 2; else if (S.rate === 'peak') s += 1;
+  if (S.bond === 'normal') s += 1; else if (S.bond === 'flat') s += 0.5;
+  if (S.inf === 'low') s += 1; else if (S.inf === 'mid') s += 0.5;
+
+  // 섹터 (최대 2)
+  if (S.sector) {
+    const d = SECTOR[S.sector];
+    const rk = S.rate === 'up' ? 'up' : S.rate === 'down' ? 'down' : 'peak';
+    if (d && d[rk].includes('강세')) s += 2;
+    else if (d && d[rk].includes('보통')) s += 1;
+  }
+
+  // 기업 (최대 7)
+  if (S.roe === 'high') s += 2; else if (S.roe === 'mid') s += 1;
+  if (S.fcf === 'pos') s += 2;
+  if (S.de === 'low') s += 1; else if (S.de === 'mid') s += 0.5;
+  if (S.per === 'low') s += 1; else if (S.per === 'fair') s += 0.5;
+  if (S.rev === 'high') s += 1; else if (S.rev === 'mid') s += 0.5;
+
+  // 차트 (최대 5)
+  if (S.trend === 'up') s += 2;
+  if (S.vol === 'up') s += 1;
+  if (S.ma === 'above') s += 1; else if (S.ma === 'cross') s += 0.5;
+  if (S.hg === 'none') s += 1;
+
+  return Math.round(s);
+}
+
+function buildChecklist() {
+  const items = [
+    { ok: S.rate === 'down' || S.rate === 'peak', text: '금리 방향: ' + (S.rate === 'down' ? '📉 인하 중 (긍정)' : S.rate === 'peak' ? '🔝 고점 유지 (중립)' : '📈 인상 중 (부정)') },
+    { ok: S.bond === 'normal', text: '장단기 금리차: ' + (S.bond === 'normal' ? '🔼 정상 (긍정)' : S.bond === 'flat' ? '➡️ 플랫 (중립)' : '🔻 역전 (부정)') },
+    { ok: S.inf === 'low' || S.inf === 'mid', text: '인플레이션: ' + (S.inf === 'low' ? '❄️ 저인플레 (긍정)' : S.inf === 'mid' ? '🌡️ 중간 (중립)' : '🔥 고인플레 (부정)') },
+    { ok: S.roe === 'high', text: 'ROE: ' + (S.roe === 'high' ? '🟢 15%↑ 우수' : S.roe === 'mid' ? '🟡 10~15% 보통' : '🔴 10%↓ 미흡') },
+    { ok: S.fcf === 'pos', text: 'FCF: ' + (S.fcf === 'pos' ? '✅ 양호' : '❌ 적자') },
+    { ok: S.de === 'low', text: 'D/E 비율: ' + (S.de === 'low' ? '💚 낮음 (건전)' : S.de === 'mid' ? '🟡 중간' : '🔴 높음') },
+    { ok: S.per === 'low' || S.per === 'fair', text: 'PER: ' + (S.per === 'low' ? '💎 저평가' : S.per === 'fair' ? '📊 적정' : '⚠️ 고평가') },
+    { ok: S.rev === 'high' || S.rev === 'mid', text: '매출성장: ' + (S.rev === 'high' ? '🚀 고성장' : S.rev === 'mid' ? '📈 성장' : '📉 역성장') },
+    { ok: S.trend === 'up', text: '추세: ' + (S.trend === 'up' ? '📈 상승' : S.trend === 'side' ? '↔️ 횡보' : '📉 하락') },
+    { ok: S.vol === 'up', text: '거래량: ' + (S.vol === 'up' ? '🔊 증가+상승 (긍정)' : S.vol === 'low' ? '🔇 감소 (중립)' : '⚠️ 증가+하락 (부정)') },
+    { ok: S.ma === 'above' || S.ma === 'cross', text: '이동평균: ' + (S.ma === 'above' ? '✅ MA 위' : S.ma === 'cross' ? '⚡ 골든크로스' : '❌ MA 아래') },
+    { ok: S.hg === 'none', text: '리스크: ' + (S.hg === 'none' ? '✅ 특이 없음' : S.hg === 'macro' ? '🌏 매크로 리스크' : S.hg === 'reg' ? '⚖️ 규제 리스크' : '📋 실적 불확실') },
+  ].filter(i => i.text !== 'null: null');
+
+  return items.map(i => `<li><span class="ck">${i.ok ? '✅' : '❌'}</span>${i.text}</li>`).join('');
+}
+
+function buildPremise() {
+  const lines = [];
+  if (S.rate === 'down') lines.push('• 금리 인하 사이클 지속 시 매수 논리 강화');
+  if (S.rate === 'up') lines.push('• ⚠️ 금리 인상 중단 또는 피벗 신호 확인 필요');
+  if (S.sector) {
+    const d = SECTOR[S.sector];
+    const rk = S.rate === 'up' ? 'up' : S.rate === 'down' ? 'down' : 'peak';
+    if (d && d[rk].includes('약세')) lines.push(`• ⚠️ 현재 금리 환경에서 ${S.sector} 섹터는 상대적 약세 — 섹터 모멘텀 개선 필요`);
+  }
+  if (S.fcf === 'neg') lines.push('• ⚠️ FCF 흑자 전환 시점 확인 필요');
+  if (S.de === 'high') lines.push('• ⚠️ 부채비율 높음 — 금리 환경 변화에 취약할 수 있음');
+  if (S.per === 'high') lines.push('• ⚠️ 고평가 구간 — 실적 서프라이즈 없으면 밸류 부담');
+  if (S.trend === 'down') lines.push('• ⚠️ 하락 추세 반전 확인 후 진입 권장');
+  if (S.hg !== 'none' && S.hg) lines.push('• ⚠️ 리스크 이벤트 해소 후 재검토');
+
+  if (!lines.length) return '';
+
+  return `<div class="premise-box">
+    <div class="premise-title">⚡ 전제 조건 (이것이 충족되어야 논리 성립)</div>
+    ${lines.map(l => `<div class="premise-item">${l}</div>`).join('')}
+  </div>`;
+}
+
+// ─────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────
+function setMsg(id, msg, type) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = `<div class="api-msg ${type}">${msg}</div>`;
+}
+
+function formatNum(n) {
+  if (!n) return '-';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'T';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'B';
+  return n.toFixed(0);
+}
+
+function formatBig(n) {
+  if (!n && n !== 0) return '-';
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1e9) return sign + '$' + (abs / 1e9).toFixed(1) + 'B';
+  if (abs >= 1e6) return sign + '$' + (abs / 1e6).toFixed(1) + 'M';
+  return sign + '$' + abs.toFixed(0);
+}
+
+function resetAll() {
+  Object.keys(S).forEach(k => S[k] = null);
+  S.ticker = '';
+  S.sectorAvgROE = null;
+  S.sectorAvgPER = null;
+
+  document.querySelectorAll('.opt-btn, .sector-btn').forEach(b => b.classList.remove('sel', 'auto-filled'));
+  document.getElementById('macro-result').className = 'macro-result';
+  document.getElementById('macro-data-grid').style.display = 'none';
+  document.getElementById('macro-data-grid').innerHTML = '';
+  document.getElementById('macro-fetch-msg').innerHTML = '';
+  document.getElementById('fin-data-grid').style.display = 'none';
+  document.getElementById('fin-data-grid').innerHTML = '';
+  document.getElementById('fin-fetch-msg').innerHTML = '';
+  document.getElementById('sector-fetch-msg').innerHTML = '';
+  document.getElementById('company-info-box').innerHTML = '';
+  document.getElementById('sector-detail-box').style.display = 'none';
+  document.getElementById('ticker-input').value = '';
+  document.getElementById('fin-ticker-input').value = '';
+  document.getElementById('rr-box').classList.remove('show');
+
+  // pills
+  for (let i = 1; i <= 5; i++) {
+    const pill = document.getElementById('pill-' + i);
+    pill.classList.remove('active', 'done');
+  }
+  // go to step 1
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-1').classList.add('active');
+  document.getElementById('pill-1').classList.add('active');
+  currentStep = 1;
+}
+
+// ─────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────
+loadKeys();
+buildSectorGrid();
+</script>
+</body>
+</html>
