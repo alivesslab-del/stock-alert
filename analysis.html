@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>투자 분석 도구</title>
+  <style>
+    :root {
+      --bg: #0f0f13;
+      --surface: #16161e;
+      --surface2: #1e1e2a;
+      --border: rgba(255,255,255,.08);
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --accent: #7c6aff;
+      --accent2: #a78bfa;
+      --green: #34d399;
+      --red: #f87171;
+      --blue: #60a5fa;
+      --yellow: #fbbf24;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* 헤더 */
+    .header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 16px 28px; display: flex; align-items: center;
+      justify-content: space-between; position: sticky; top: 0; z-index: 100;
+    }
+    .header-title { font-size: 16px; font-weight: 700; color: var(--accent2); }
+    .header-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* 진행 바 */
+    .progress-bar {
+      display: flex; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px; overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .progress-bar::-webkit-scrollbar { display: none; }
+    .step-pill {
+      flex: 1; min-width: 80px; padding: 11px 6px;
+      text-align: center; font-size: 11px; font-weight: 500;
+      color: var(--muted); border-bottom: 2px solid transparent;
+      white-space: nowrap; transition: all .2s;
+    }
+    .step-pill.active { color: var(--accent2); border-bottom-color: var(--accent); }
+    .step-pill.done { color: var(--green); }
+
+    /* 메인 */
+    .main { max-width: 760px; margin: 0 auto; padding: 32px 24px; }
+
+    /* 카드 */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px; margin-bottom: 16px;
+    }
+    .card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .card-desc { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+
+    /* 섹션 라벨 */
+    .section-label {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      letter-spacing: .06em; text-transform: uppercase;
+      margin-bottom: 10px; margin-top: 20px;
+    }
+    .section-label:first-child { margin-top: 0; }
+
+    /* 옵션 버튼 */
+    .option-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .option-btn {
+      padding: 8px 14px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--muted); font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: all .2s; font-family: inherit;
+    }
+    .option-btn:hover { border-color: rgba(124,106,255,.4); color: var(--accent2); }
+    .option-btn.sel-purple { background: rgba(124,106,255,.15); border-color: var(--accent); color: var(--accent2); font-weight: 600; }
+    .option-btn.sel-green  { background: rgba(52,211,153,.1);   border-color: var(--green);  color: var(--green);   font-weight: 600; }
+    .option-btn.sel-red    { background: rgba(248,113,113,.1);  border-color: var(--red);    color: var(--red);     font-weight: 600; }
+    .option-btn.sel-yellow { background: rgba(251,191,36,.1);   border-color: var(--yellow); color: var(--yellow);  font-weight: 600; }
+
+    /* 판정 박스 */
+    .verdict-box { border-radius: 12px; padding: 16px 20px; margin-top: 16px; display: none; }
+    .verdict-box.show { display: block; }
+    .verdict-box.good   { background: rgba(52,211,153,.07);  border: 1px solid rgba(52,211,153,.3); }
+    .verdict-box.warn   { background: rgba(251,191,36,.07);  border: 1px solid rgba(251,191,36,.3); }
+    .verdict-box.bad    { background: rgba(248,113,113,.07); border: 1px solid rgba(248,113,113,.3); }
+    .verdict-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+    .verdict-title.good   { color: var(--green); }
+    .verdict-title.warn   { color: var(--yellow); }
+    .verdict-title.bad    { color: var(--red); }
+
+    /* 네비게이션 버튼 */
+    .nav-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+    .btn-back {
+      padding: 10px 20px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--muted); font-size: 13px; cursor: pointer;
+      font-family: inherit; transition: all .2s;
+    }
+    .btn-back:hover { border-color: rgba(255,255,255,.2); color: var(--text); }
+    .btn-next {
+      padding: 10px 24px; border-radius: 10px; border: none;
+      background: linear-gradient(135deg, var(--accent), #9c6dff);
+      color: #fff; font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all .2s;
+    }
+    .btn-next:hover { opacity: .88; }
+    .btn-next:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* 인풋 */
+    .form-input {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 14px;
+      font-size: 13px; color: var(--text); font-family: inherit;
+      outline: none; transition: border-color .2s; width: 100%;
+    }
+    .form-input:focus { border-color: var(--accent); }
+    .form-input::placeholder { color: var(--muted); }
+
+    /* 리스크 계산 */
+    .input-row { display: flex; gap: 12px; align-items: center; }
+    .input-label { font-size: 12px; color: var(--muted); flex-shrink: 0; width: 90px; }
+
+    /* 스텝 콘텐츠 */
+    .step-content { display: none; }
+    .step-content.active { display: block; }
+
+    /* 최종 판정 */
+    .final-card { border-radius: 16px; padding: 32px 24px; text-align: center; margin-bottom: 16px; }
+    .final-card.buy   { background: rgba(52,211,153,.08);  border: 1px solid rgba(52,211,153,.35); }
+    .final-card.hold  { background: rgba(251,191,36,.08);  border: 1px solid rgba(251,191,36,.35); }
+    .final-card.avoid { background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.35); }
+    .final-verdict-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .final-verdict-text { font-size: 32px; font-weight: 800; margin-bottom: 8px; }
+    .final-verdict-text.buy   { color: var(--green); }
+    .final-verdict-text.hold  { color: var(--yellow); }
+    .final-verdict-text.avoid { color: var(--red); }
+    .final-verdict-sub { font-size: 12px; color: var(--muted); }
+
+    /* 체크 로우 */
+    .check-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .check-row:last-child { border-bottom: none; }
+    .check-icon { font-size: 16px; flex-shrink: 0; }
+    .check-label { font-weight: 600; min-width: 110px; flex-shrink: 0; }
+    .check-detail { font-size: 12px; color: var(--muted); }
+
+    /* 전제 박스 */
+    .premise-box {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 18px;
+      font-size: 12px; line-height: 1.9; color: var(--muted);
+      margin-top: 10px;
+    }
+
+    /* 리셋 */
+    .btn-reset {
+      padding: 10px 24px; border-radius: 10px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); font-size: 13px; cursor: pointer;
+      font-family: inherit; transition: all .2s; margin-top: 8px;
+    }
+    .btn-reset:hover { border-color: rgba(255,255,255,.2); color: var(--text); }
+
+    /* 반응형 */
+    @media (max-width: 600px) {
+      .main { padding: 16px 12px; }
+      .header { padding: 14px 16px; }
+      .card { padding: 16px; }
+      .final-verdict-text { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="header">
+  <div>
+    <div class="header-title">🧭 투자 분석 도구</div>
+    <div class="header-sub">환경 → 섹터 → 기업 → 차트 → 최종 판정</div>
+  </div>
+  <a href="index.html" style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:8px;">← 포트폴리오</a>
+</div>
+
+<!-- 진행 바 -->
+<div class="progress-bar">
+  <div class="step-pill active" id="pill-1">① 매크로</div>
+  <div class="step-pill" id="pill-2">② 섹터</div>
+  <div class="step-pill" id="pill-3">③ 기업</div>
+  <div class="step-pill" id="pill-4">④ 차트·리스크</div>
+  <div class="step-pill" id="pill-5">⑤ 최종 판정</div>
+</div>
+
+<div class="main">
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- STEP 1 : 매크로 환경                   -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="step-content active" id="step-1">
+    <div class="card">
+      <div class="card-title">📡 STEP 1 — 매크로 환경 파악</div>
+      <div class="card-desc">지금이 어떤 국면인지 먼저 정의한다. 종목은 그 다음이다.</div>
+
+      <div class="section-label">① 기준금리 방향</div>
+      <div class="option-group" id="rate-group">
+        <button class="option-btn" onclick="pick(this,'rate','인상 중')">📈 인상 중</button>
+        <button class="option-btn" onclick="pick(this,'rate','인상 후반')">📈 인상 후반</button>
+        <button class="option-btn" onclick="pick(this,'rate','고점/동결')">➡️ 고점/동결</button>
+        <button class="option-btn" onclick="pick(this,'rate','인하 초입')">📉 인하 초입</button>
+        <button class="option-btn" onclick="pick(this,'rate','인하 후반')">📉 인하 후반</button>
+        <button class="option-btn" onclick="pick(this,'rate','저금리 유지')">⬇️ 저금리 유지</button>
+      </div>
+
+      <div class="section-label">② 유동성 (QE / QT)</div>
+      <div class="option-group" id="liquidity-group">
+        <button class="option-btn" onclick="pick(this,'liquidity','QT (긴축)')">🔴 QT (긴축)</button>
+        <button class="option-btn" onclick="pick(this,'liquidity','QT → 중립')">🟡 QT → 중립</button>
+        <button class="option-btn" onclick="pick(this,'liquidity','QE (완화)')">🟢 QE (완화)</button>
+      </div>
+
+      <div class="section-label">③ 채권 신호</div>
+      <div class="option-group" id="bond-group">
+        <button class="option-btn" onclick="pick(this,'bond','장기채 강세')">🔴 장기채 강세 (안전선호)</button>
+        <button class="option-btn" onclick="pick(this,'bond','중립')">🟡 중립</button>
+        <button class="option-btn" onclick="pick(this,'bond','채권 약세')">🟢 채권 약세 (위험선호)</button>
+        <button class="option-btn" onclick="pick(this,'bond','금리차 역전')">🚨 장단기 금리차 역전</button>
+      </div>
+
+      <div class="section-label">④ 물가 (CPI) 방향</div>
+      <div class="option-group" id="inflation-group">
+        <button class="option-btn" onclick="pick(this,'inflation','상승')">🔴 상승 (긴축 압력)</button>
+        <button class="option-btn" onclick="pick(this,'inflation','안정')">🟡 안정</button>
+        <button class="option-btn" onclick="pick(this,'inflation','둔화')">🟢 둔화 (인하 여지)</button>
+        <button class="option-btn" onclick="pick(this,'inflation','디스인플레')">⚠️ 디스인플레</button>
+      </div>
+
+      <!-- 자동 판정 -->
+      <div class="verdict-box" id="macro-verdict">
+        <div class="verdict-title" id="macro-verdict-title"></div>
+        <div id="macro-verdict-body" style="font-size:12px;line-height:1.9;color:var(--muted)"></div>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-next" id="next-1" onclick="goStep(2)" disabled>다음 — 섹터 선택 →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- STEP 2 : 섹터                          -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="step-content" id="step-2">
+    <div class="card">
+      <div class="card-title">📂 STEP 2 — 섹터 선택</div>
+      <div id="step2-ctx" style="font-size:12px;color:var(--muted);margin-bottom:16px;padding:10px 14px;background:var(--surface2);border-radius:8px;line-height:1.8;"></div>
+
+      <div class="section-label">분석할 종목의 섹터</div>
+      <div class="option-group" id="sector-group" style="gap:7px;">
+        <button class="option-btn" onclick="pickSector(this,'IT / 기술')">💻 IT / 기술</button>
+        <button class="option-btn" onclick="pickSector(this,'커뮤니케이션')">📡 커뮤니케이션</button>
+        <button class="option-btn" onclick="pickSector(this,'산업재')">⚙️ 산업재</button>
+        <button class="option-btn" onclick="pickSector(this,'소재')">🪨 소재</button>
+        <button class="option-btn" onclick="pickSector(this,'경기소비재')">🛍️ 경기소비재</button>
+        <button class="option-btn" onclick="pickSector(this,'금융')">🏦 금융</button>
+        <button class="option-btn" onclick="pickSector(this,'부동산/리츠')">🏢 부동산/리츠</button>
+        <button class="option-btn" onclick="pickSector(this,'필수소비재')">🛒 필수소비재</button>
+        <button class="option-btn" onclick="pickSector(this,'헬스케어')">🏥 헬스케어</button>
+        <button class="option-btn" onclick="pickSector(this,'유틸리티')">⚡ 유틸리티</button>
+        <button class="option-btn" onclick="pickSector(this,'통신')">📶 통신</button>
+        <button class="option-btn" onclick="pickSector(this,'에너지')">🛢️ 에너지</button>
+        <button class="option-btn" onclick="pickSector(this,'테마 섹터')">🚀 테마 섹터</button>
+      </div>
+
+      <div class="section-label">섹터의 경기 사이클 위치</div>
+      <div class="option-group" id="cycle-group">
+        <button class="option-btn" onclick="pick(this,'cycle','저점')">📉 저점 (기대 최저)</button>
+        <button class="option-btn" onclick="pick(this,'cycle','상승 중')">📈 상승 중</button>
+        <button class="option-btn" onclick="pick(this,'cycle','고점')">🔝 고점 (기대 최고)</button>
+        <button class="option-btn" onclick="pick(this,'cycle','하락 중')">📉 하락 중</button>
+      </div>
+
+      <div class="verdict-box" id="sector-verdict">
+        <div class="verdict-title" id="sector-verdict-title"></div>
+        <div id="sector-verdict-body" style="font-size:12px;line-height:1.9;color:var(--muted)"></div>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-back" onclick="goStep(1)">← 이전</button>
+      <button class="btn-next" id="next-2" onclick="goStep(3)" disabled>다음 — 기업 분석 →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- STEP 3 : 기업                          -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="step-content" id="step-3">
+    <div class="card">
+      <div class="card-title">🏢 STEP 3 — 기업 재무 체크</div>
+      <div class="card-desc">좋은 회사인지 확인한다. 섹터 평균 대비로만 판단.</div>
+
+      <div class="section-label">종목명 (선택 입력)</div>
+      <input class="form-input" id="stock-name" type="text" placeholder="예: 삼성전자, NVDA, AAPL ..." />
+
+      <div class="section-label">ROE — 섹터 평균 대비</div>
+      <div class="option-group" id="roe-group">
+        <button class="option-btn" onclick="pick(this,'roe','우위')">✅ 우위 (섹터 평균 이상)</button>
+        <button class="option-btn" onclick="pick(this,'roe','비슷')">🟡 비슷</button>
+        <button class="option-btn" onclick="pick(this,'roe','하위')">❌ 하위</button>
+        <button class="option-btn" onclick="pick(this,'roe','부채 뻥튀기 의심')">⚠️ 부채 뻥튀기 의심</button>
+      </div>
+
+      <div class="section-label">영업현금흐름</div>
+      <div class="option-group" id="cashflow-group">
+        <button class="option-btn" onclick="pick(this,'cashflow','플러스')">✅ 플러스 (안정적)</button>
+        <button class="option-btn" onclick="pick(this,'cashflow','마이너스')">❌ 마이너스</button>
+        <button class="option-btn" onclick="pick(this,'cashflow','불확실')">🟡 불확실</button>
+      </div>
+
+      <div class="section-label">자본잠식 여부</div>
+      <div class="option-group" id="equity-group">
+        <button class="option-btn" onclick="pick(this,'equity','없음')">✅ 없음</button>
+        <button class="option-btn" onclick="pick(this,'equity','있음')">❌ 있음</button>
+      </div>
+
+      <div class="section-label">PER — 역사적·섹터 대비</div>
+      <div class="option-group" id="per-group">
+        <button class="option-btn" onclick="pick(this,'per','저평가')">✅ 저평가 (역사적 하단)</button>
+        <button class="option-btn" onclick="pick(this,'per','적정')">🟡 적정</button>
+        <button class="option-btn" onclick="pick(this,'per','고평가')">⚠️ 고평가</button>
+        <button class="option-btn" onclick="pick(this,'per','적자')">❌ 적자 (PER 없음)</button>
+      </div>
+
+      <div class="verdict-box" id="company-verdict">
+        <div class="verdict-title" id="company-verdict-title"></div>
+        <div id="company-verdict-body" style="font-size:12px;line-height:1.9;color:var(--muted)"></div>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-back" onclick="goStep(2)">← 이전</button>
+      <button class="btn-next" id="next-3" onclick="goStep(4)" disabled>다음 — 차트·리스크 →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- STEP 4 : 차트 & 리스크                 -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="step-content" id="step-4">
+    <div class="card">
+      <div class="card-title">📈 STEP 4 — 차트 & 리스크 정의</div>
+      <div class="card-desc">리스크를 정의할 수 없으면 매수하지 않는다.</div>
+
+      <div class="section-label">추세 방향</div>
+      <div class="option-group" id="trend-group">
+        <button class="option-btn" onclick="pick(this,'trend','상승 추세')">📈 상승 추세</button>
+        <button class="option-btn" onclick="pick(this,'trend','횡보')">➡️ 횡보</button>
+        <button class="option-btn" onclick="pick(this,'trend','하락 추세')">📉 하락 추세</button>
+      </div>
+
+      <div class="section-label">거래량 상태</div>
+      <div class="option-group" id="volume-group">
+        <button class="option-btn" onclick="pick(this,'volume','상승+증가')">✅ 상승 + 거래량 증가</button>
+        <button class="option-btn" onclick="pick(this,'volume','상승+감소')">⚠️ 상승 + 거래량 감소</button>
+        <button class="option-btn" onclick="pick(this,'volume','하락+증가')">❌ 하락 + 거래량 증가</button>
+        <button class="option-btn" onclick="pick(this,'volume','불분명')">🟡 불분명</button>
+      </div>
+
+      <div class="section-label">장기 이동평균선 위치</div>
+      <div class="option-group" id="ma-group">
+        <button class="option-btn" onclick="pick(this,'ma','위')">✅ 이평선 위 (환경 우호)</button>
+        <button class="option-btn" onclick="pick(this,'ma','아래')">❌ 이평선 아래 (리스크)</button>
+        <button class="option-btn" onclick="pick(this,'ma','근접')">🟡 근접 (방향 확인 필요)</button>
+      </div>
+
+      <div class="section-label" style="margin-top:24px">리스크/리워드 계산 (선택)</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="input-row">
+          <span class="input-label">진입 예정가</span>
+          <input class="form-input" id="price-entry" type="number" placeholder="0" oninput="calcRisk()" style="flex:1" />
+          <span style="font-size:12px;color:var(--muted);flex-shrink:0">원 / $</span>
+        </div>
+        <div class="input-row">
+          <span class="input-label">손절가</span>
+          <input class="form-input" id="price-stop" type="number" placeholder="0" oninput="calcRisk()" style="flex:1" />
+          <span style="font-size:12px;color:var(--muted);flex-shrink:0">원 / $</span>
+        </div>
+        <div class="input-row">
+          <span class="input-label">1차 목표가</span>
+          <input class="form-input" id="price-target" type="number" placeholder="0" oninput="calcRisk()" style="flex:1" />
+          <span style="font-size:12px;color:var(--muted);flex-shrink:0">원 / $</span>
+        </div>
+      </div>
+
+      <div id="risk-result" style="display:none;margin-top:14px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">손절 리스크</div>
+            <div style="font-size:20px;font-weight:700;color:var(--red)" id="stop-pct">—</div>
+          </div>
+          <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">목표 수익</div>
+            <div style="font-size:20px;font-weight:700;color:var(--green)" id="target-pct">—</div>
+          </div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">리스크:리워드</div>
+            <div style="font-size:20px;font-weight:700;color:var(--accent2)" id="rr-ratio">—</div>
+          </div>
+        </div>
+        <div id="rr-comment" style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"></div>
+      </div>
+
+      <div class="section-label">헷지 필요 여부</div>
+      <div class="option-group" id="hedge-group">
+        <button class="option-btn" onclick="pick(this,'hedge','불필요')">✅ 불필요</button>
+        <button class="option-btn" onclick="pick(this,'hedge','검토')">🟡 검토 필요</button>
+        <button class="option-btn" onclick="pick(this,'hedge','필요')">⚠️ 필요</button>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-back" onclick="goStep(3)">← 이전</button>
+      <button class="btn-next" id="next-4" onclick="goStep(5)" disabled>최종 판정 →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- STEP 5 : 최종 판정                     -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="step-content" id="step-5">
+    <div id="final-output"></div>
+    <div class="nav-row" style="justify-content:center;">
+      <button class="btn-reset" onclick="resetAll()">🔄 새 종목 분석하기</button>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ── 상태 ────────────────────────────────────────────────────────────────
+const S = {
+  rate:null, liquidity:null, bond:null, inflation:null,
+  sector:null, cycle:null,
+  roe:null, cashflow:null, equity:null, per:null,
+  trend:null, volume:null, ma:null, hedge:null
+};
+
+// ── 섹터 데이터 ─────────────────────────────────────────────────────────
+const SECTOR = {
+  'IT / 기술':    { 인상:'❌', 고점:'⚠️', 인하:'⭕', desc:'고성장·고PER. 금리 상승 시 할인율 급등으로 밸류에이션 직격탄. 유동성 장세에서 폭발적 반응.' },
+  '커뮤니케이션': { 인상:'❌', 고점:'⚠️', 인하:'⭕', desc:'플랫폼·광고 기반. 기대 심리로 움직이며 실적 변동성 큼. 금리에 민감.' },
+  '산업재':       { 인상:'⚠️', 고점:'⚠️', 인하:'⭕', desc:'경기 사이클을 직접 반영. 수주·PMI·가동률이 핵심 선행 지표.' },
+  '소재':         { 인상:'⚠️', 고점:'❌', 인하:'⭕', desc:'글로벌 경기 회복 수혜. 원자재 가격·달러 강약에 연동.' },
+  '경기소비재':   { 인상:'❌', 고점:'❌', 인하:'⭕', desc:'소비 여력에 직결. 금리 상승 = 대출 부담 증가 = 소비 위축.' },
+  '금융':         { 인상:'⭕', 고점:'⚠️', 인하:'⚠️', desc:'ROE 구조적으로 높음. 금리 상승 시 순이자마진(NIM) 확대로 수익 개선.' },
+  '부동산/리츠':  { 인상:'❌', 고점:'❌', 인하:'⭕', desc:'금리·차입 비용에 극도로 민감. 인하기 가장 먼저 반응하는 섹터.' },
+  '필수소비재':   { 인상:'⭕', 고점:'⭕', 인하:'⚠️', desc:'어떤 환경에서도 안정적 수요. 경기 방어의 핵심. 확장기엔 상대적으로 뒤처짐.' },
+  '헬스케어':     { 인상:'⭕', 고점:'⭕', 인하:'⚠️', desc:'경기 둔감, 고령화 구조적 성장. 정책 규제(약가 통제 등) 리스크 주의.' },
+  '유틸리티':     { 인상:'⭕', 고점:'⭕', 인하:'⚠️', desc:'방어 최강, 배당 성격. 금리 인상기 상대적 매력 유지. 성장 기대 낮음.' },
+  '통신':         { 인상:'⭕', 고점:'⭕', 인하:'⚠️', desc:'안정적 현금흐름, 성장 낮음. 배당 목적 보유. 5G 등 capex 부담 존재.' },
+  '에너지':       { 인상:'⭕', 고점:'⚠️', 인하:'⚠️', desc:'원유·가스 가격과 지정학 변수에 좌우. 실물 인플레 헷지 역할.' },
+  '테마 섹터':    { 인상:'❌', 고점:'❌', 인하:'⭕', desc:'AI·2차전지·방산 등 기대·정책 중심. 변동성 극대. 유동성 없으면 추세도 없다.' },
+};
+
+// ── 매크로 점수 계산 ────────────────────────────────────────────────────
+function macroScore() {
+  let s = 0;
+  if (S.rate === '인상 중')     s += 3;
+  else if (S.rate === '인상 후반') s += 2;
+  else if (S.rate === '고점/동결') s += 1;
+  else if (S.rate === '인하 초입') s += 0;
+  else if (S.rate === '인하 후반') s -= 2;
+  else if (S.rate === '저금리 유지') s -= 3;
+
+  if (S.liquidity === 'QT (긴축)') s += 2;
+  else if (S.liquidity === 'QT → 중립') s += 1;
+  else if (S.liquidity === 'QE (완화)') s -= 2;
+
+  if (S.bond === '장기채 강세') s += 2;
+  else if (S.bond === '금리차 역전') s += 3;
+  else if (S.bond === '채권 약세') s -= 1;
+
+  if (S.inflation === '상승') s += 1;
+  else if (S.inflation === '둔화') s -= 1;
+  else if (S.inflation === '디스인플레') s += 1;
+  return s;
+}
+
+function macroInfo(score) {
+  if (score >= 6) return { phase:'① 긴축 국면',   cls:'bad',  action:'공격 자산 즉시 축소',         good:'금융, 현금',             bad:'성장주, 테마',     alloc:'방어 50 / 중립 30 / 공격 20' };
+  if (score >= 4) return { phase:'② 방어 국면',   cls:'bad',  action:'방어 유지, 신규 진입 자제',    good:'필수소비재, 유틸, 헬스케어', bad:'경기민감주',     alloc:'방어 45 / 중립 30 / 공격 25' };
+  if (score >= 1) return { phase:'③ 전환 대기',   cls:'warn', action:'관찰, 장기채 비중 서서히 확대', good:'헬스케어, 우량 대형주',    bad:'고부채 기업',    alloc:'방어 40 / 중립 35 / 공격 25' };
+  if (score >= -1)return { phase:'④ 초기 회복',   cls:'warn', action:'채권 먼저, 주식은 선별',       good:'대형 IT, 산업재',          bad:'소형 테마',      alloc:'방어 35 / 중립 40 / 공격 25' };
+  return              { phase:'⑤ 확장 국면',   cls:'good', action:'위험자산 비중 확대',           good:'IT, 소비재, 성장주',       bad:'방어주 과다 보유', alloc:'방어 25 / 중립 25 / 공격 50' };
+}
+
+// ── 섹터 금리 적합도 ────────────────────────────────────────────────────
+function sectorCompat() {
+  const sd = SECTOR[S.sector]; if (!sd) return null;
+  const r = S.rate;
+  if (r === '인상 중' || r === '인상 후반') return sd.인상;
+  if (r === '인하 초입' || r === '인하 후반' || r === '저금리 유지') return sd.인하;
+  return sd.고점;
+}
+
+// ── pick / pickSector ───────────────────────────────────────────────────
+function pick(btn, key, val) {
+  btn.closest('.option-group').querySelectorAll('.option-btn')
+    .forEach(b => b.classList.remove('sel-purple','sel-green','sel-red','sel-yellow'));
+  const color = val.startsWith('✅') ? 'sel-green' : val.startsWith('❌') ? 'sel-red' : val.startsWith('⚠️') ? 'sel-yellow' : 'sel-purple';
+  btn.classList.add(color);
+  S[key] = val;
+  afterPick(key);
+}
+
+function pickSector(btn, val) {
+  btn.closest('.option-group').querySelectorAll('.option-btn')
+    .forEach(b => b.classList.remove('sel-purple'));
+  btn.classList.add('sel-purple');
+  S.sector = val;
+  afterPick('sector');
+}
+
+function afterPick(key) {
+  if (['rate','liquidity','bond','inflation'].includes(key)) {
+    if (S.rate && S.liquidity && S.bond && S.inflation) {
+      renderMacroVerdict(); document.getElementById('next-1').disabled = false;
+    }
+  }
+  if (['sector','cycle'].includes(key)) {
+    if (S.sector && S.cycle) {
+      renderSectorVerdict(); document.getElementById('next-2').disabled = false;
+    }
+  }
+  if (['roe','cashflow','equity','per'].includes(key)) {
+    if (S.roe && S.cashflow && S.equity && S.per) {
+      renderCompanyVerdict(); document.getElementById('next-3').disabled = false;
+    }
+  }
+  if (['trend','volume','ma','hedge'].includes(key)) {
+    if (S.trend && S.volume && S.ma && S.hedge) {
+      document.getElementById('next-4').disabled = false;
+    }
+  }
+}
+
+// ── 판정 렌더링 ─────────────────────────────────────────────────────────
+function renderMacroVerdict() {
+  const score = macroScore(), info = macroInfo(score);
+  const box = document.getElementById('macro-verdict');
+  const title = document.getElementById('macro-verdict-title');
+  const body = document.getElementById('macro-verdict-body');
+  box.className = `verdict-box show ${info.cls}`;
+  title.className = `verdict-title ${info.cls}`;
+  title.textContent = `📌 현재 판정: ${info.phase}`;
+  body.innerHTML = `
+    <strong style="color:var(--text)">권고 행동:</strong> ${info.action}<br>
+    <strong style="color:var(--text)">유리 섹터:</strong> <span style="color:var(--green)">${info.good}</span><br>
+    <strong style="color:var(--text)">피할 곳:</strong> <span style="color:var(--red)">${info.bad}</span><br>
+    <strong style="color:var(--text)">권고 자산 배분 (%):</strong> ${info.alloc}`;
+}
+
+function renderSectorVerdict() {
+  const compat = sectorCompat();
+  const sd = SECTOR[S.sector];
+  const cls = compat === '⭕' ? 'good' : compat === '❌' ? 'bad' : 'warn';
+  const label = compat === '⭕' ? '현재 환경에 유리한 섹터' : compat === '❌' ? '현재 환경에 불리한 섹터' : '주의 필요 — 선별적 접근';
+  const cycleMsg = {
+    '저점':   '📌 사이클 저점 — 기대 최저, 반등 여지. 재무 우수 기업 선별 가능.',
+    '상승 중':'📌 사이클 상승 중 — 모멘텀 존재. 진입 타이밍 확인 필요.',
+    '고점':   '⚠️ 사이클 고점 — 기대 최고 수준. 추격 매수 위험.',
+    '하락 중':'❌ 사이클 하락 중 — 기대 꺾이는 구간. 진입 자제.'
+  }[S.cycle] || '';
+  const box = document.getElementById('sector-verdict');
+  box.className = `verdict-box show ${cls}`;
+  document.getElementById('sector-verdict-title').className = `verdict-title ${cls}`;
+  document.getElementById('sector-verdict-title').textContent = `${compat} ${S.sector} — ${label}`;
+  document.getElementById('sector-verdict-body').innerHTML = `
+    <strong style="color:var(--text)">섹터 특징:</strong> ${sd.desc}<br>${cycleMsg}`;
+}
+
+function renderCompanyVerdict() {
+  const hardFail = S.cashflow === '마이너스' || S.equity === '있음' || S.per === '적자';
+  const warn = S.roe === '하위' || S.roe === '부채 뻥튀기 의심' || S.per === '고평가';
+  let cls, label, body;
+  if (hardFail) {
+    cls = 'bad'; label = '❌ 즉시 제외 — 기본 조건 미충족';
+    body = '영업현금흐름 마이너스 / 자본잠식 / 지속 적자 중 하나 이상 해당. 재무 구조상 매수 불가.';
+  } else if (warn) {
+    cls = 'warn'; label = '⚠️ 주의 — 조건 일부 미충족';
+    body = 'ROE가 섹터 대비 부족하거나 PER 고평가. 추가 확인 필요.';
+  } else {
+    cls = 'good'; label = '✅ 통과 — 기업 재무 조건 충족';
+    body = 'ROE 우위 + 현금흐름 안정 + PER 합리적. 차트·리스크 단계로 진행.';
+  }
+  if (S.roe === '우위' && S.per === '저평가')
+    body += ' &nbsp;<strong style="color:var(--green)">🌟 ROE↑ + PER↓ — 최상의 조합!</strong>';
+  const box = document.getElementById('company-verdict');
+  box.className = `verdict-box show ${cls}`;
+  document.getElementById('company-verdict-title').className = `verdict-title ${cls}`;
+  document.getElementById('company-verdict-title').textContent = label;
+  document.getElementById('company-verdict-body').innerHTML = body;
+}
+
+// ── 리스크 계산 ─────────────────────────────────────────────────────────
+function calcRisk() {
+  const entry = parseFloat(document.getElementById('price-entry').value);
+  const stop  = parseFloat(document.getElementById('price-stop').value);
+  const tgt   = parseFloat(document.getElementById('price-target').value);
+  if (!entry || !stop || !tgt || entry <= 0) {
+    document.getElementById('risk-result').style.display = 'none'; return;
+  }
+  const stopPct   = ((stop - entry) / entry * 100).toFixed(1);
+  const targetPct = ((tgt  - entry) / entry * 100).toFixed(1);
+  const rr = Math.abs(parseFloat(targetPct) / parseFloat(stopPct)).toFixed(2);
+  document.getElementById('stop-pct').textContent   = stopPct + '%';
+  document.getElementById('target-pct').textContent = (targetPct > 0 ? '+' : '') + targetPct + '%';
+  document.getElementById('rr-ratio').textContent   = '1 : ' + rr;
+  const rrN = parseFloat(rr);
+  document.getElementById('rr-comment').textContent =
+    rrN >= 2 ? '✅ 리스크/리워드 양호 (1:2 이상)' :
+    rrN >= 1.5 ? '🟡 리스크/리워드 적정' :
+    '❌ 리스크/리워드 불량 — 진입 재검토 권장';
+  document.getElementById('risk-result').style.display = 'block';
+}
+
+// ── 최종 판정 빌드 ──────────────────────────────────────────────────────
+function buildFinal() {
+  const score = macroScore();
+  const info  = macroInfo(score);
+  const compat = sectorCompat();
+  const name = document.getElementById('stock-name').value.trim() || '분석 종목';
+
+  const macroOK   = score <= 1;
+  const sectorOK  = compat === '⭕';
+  const sectorWRN = compat === '⚠️';
+  const cycleOK   = S.cycle === '저점' || S.cycle === '상승 중';
+  const hardFail  = S.cashflow === '마이너스' || S.equity === '있음' || S.per === '적자';
+  const compWarn  = S.roe === '하위' || S.roe === '부채 뻥튀기 의심' || S.per === '고평가';
+  const compOK    = !hardFail && !compWarn;
+  const chartOK   = S.trend === '상승 추세' && S.ma === '위';
+  const chartWRN  = S.trend === '횡보' || S.ma === '근접';
+
+  // 판정 로직
+  let verdict, vClass;
+  const hardCount = [!macroOK && score > 3, !sectorOK && !sectorWRN, hardFail, S.trend === '하락 추세'].filter(Boolean).length;
+  if (hardFail) {
+    verdict = '매수 제외'; vClass = 'avoid';
+  } else if (hardCount >= 2) {
+    verdict = '매수 제외'; vClass = 'avoid';
+  } else if (hardCount === 1 || (!macroOK) || compWarn || chartWRN || !cycleOK) {
+    verdict = '보류 · 관찰'; vClass = 'hold';
+  } else if (macroOK && sectorOK && compOK && chartOK && cycleOK) {
+    verdict = '매수 검토'; vClass = 'buy';
+  } else {
+    verdict = '보류 · 관찰'; vClass = 'hold';
+  }
+  const verdictMsg = vClass === 'buy'   ? '모든 조건 통과. 포지션 크기와 손절가를 확인하고 진입하세요.' :
+                     vClass === 'hold'  ? '일부 조건이 미충족. 조건이 개선될 때까지 관찰하세요.' :
+                                         '핵심 조건 미충족. 매수하지 않습니다.';
+
+  // 체크 항목
+  const checks = [
+    { label:'매크로 환경', ok: macroOK,   warn: score >= 0 && score <= 3, detail: info.phase },
+    { label:'섹터 적합성', ok: sectorOK,  warn: sectorWRN, detail: `${S.sector} ${compat || ''}` },
+    { label:'섹터 사이클', ok: cycleOK,   warn: S.cycle === '고점', detail: `사이클 ${S.cycle}` },
+    { label:'기업 재무',   ok: compOK,    warn: compWarn, detail: hardFail ? '즉시 제외 조건' : compWarn ? '일부 미충족' : 'ROE·현금흐름·PER 통과' },
+    { label:'차트·추세',   ok: chartOK,   warn: chartWRN, detail: `${S.trend} / 이평선 ${S.ma}` },
+  ];
+  const checksHTML = checks.map(c => {
+    const icon  = c.ok ? '✅' : c.warn ? '⚠️' : '❌';
+    return `<div class="check-row">
+      <span class="check-icon">${icon}</span>
+      <span class="check-label">${c.label}</span>
+      <span class="check-detail">${c.detail}</span>
+    </div>`;
+  }).join('');
+
+  // 전제 박스
+  const premise = `
+    <strong style="color:var(--text)">시장 국면:</strong> ${info.phase} (${S.rate} / ${S.liquidity})<br>
+    <strong style="color:var(--text)">섹터 전제:</strong> ${S.sector} — 사이클 ${S.cycle}<br>
+    <strong style="color:var(--text)">기업 전제:</strong> ROE ${S.roe} / 현금흐름 ${S.cashflow} / PER ${S.per}<br>
+    <strong style="color:var(--text)">차트 전제:</strong> ${S.trend} / 이평선 ${S.ma}<br>
+    <br>
+    👉 이 전제가 <strong style="color:var(--red)">훼손</strong>되면 비중 조절 또는 정리<br>
+    👉 이 전제가 <strong style="color:var(--green)">유지</strong>되면 뉴스 소음 무시하고 버팀`;
+
+  document.getElementById('final-output').innerHTML = `
+    <div class="final-card ${vClass}">
+      <div class="final-verdict-label">🧭 ${name}에 대한 최종 판정</div>
+      <div class="final-verdict-text ${vClass}">${verdict}</div>
+      <div class="final-verdict-sub">${verdictMsg}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 단계별 체크 결과</div>
+      ${checksHTML}
+    </div>
+
+    <div class="card">
+      <div class="card-title">📌 나의 투자 전제</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+        뉴스를 볼 때마다 아래 전제가 깨졌는지 확인한다.<br>
+        <strong style="color:var(--accent2)">"호재/악재인가?"가 아니라 "전제가 깨졌는가?"</strong>
+      </div>
+      <div class="premise-box">${premise}</div>
+    </div>
+
+    <div class="card" style="background:linear-gradient(135deg,rgba(124,106,255,.06),rgba(167,139,250,.03));">
+      <div class="card-title">💬 최종 확인 질문</div>
+      <div style="font-size:14px;font-style:italic;line-height:2;color:var(--text)">
+        "지금 이 선택은 <strong style="color:var(--green)">더 벌기 위해서</strong>인가,<br>
+        <strong style="color:var(--accent2)">덜 잃기 위해서</strong>인가?"<br>
+        <span style="font-size:12px;color:var(--muted)">더 벌기 → ❌ 조건 다시 확인 &nbsp;·&nbsp; 덜 잃기 → ✅ 실행</span>
+      </div>
+    </div>`;
+}
+
+// ── 스텝 이동 ───────────────────────────────────────────────────────────
+function goStep(n) {
+  document.querySelectorAll('.step-content').forEach(el => el.classList.remove('active'));
+  document.getElementById(`step-${n}`).classList.add('active');
+  document.querySelectorAll('.step-pill').forEach((el, i) => {
+    el.classList.remove('active','done');
+    if      (i + 1 < n) el.classList.add('done');
+    else if (i + 1 === n) el.classList.add('active');
+  });
+  if (n === 2) {
+    const info = macroInfo(macroScore());
+    document.getElementById('step2-ctx').innerHTML =
+      `현재 시장 국면: <strong style="color:var(--accent2)">${info.phase}</strong><br>
+       환경 유리 섹터: <span style="color:var(--green)">${info.good}</span> &nbsp;·&nbsp;
+       피할 섹터: <span style="color:var(--red)">${info.bad}</span>`;
+  }
+  if (n === 5) buildFinal();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── 리셋 ────────────────────────────────────────────────────────────────
+function resetAll() {
+  Object.keys(S).forEach(k => S[k] = null);
+  document.querySelectorAll('.option-btn').forEach(b =>
+    b.classList.remove('sel-purple','sel-green','sel-red','sel-yellow'));
+  document.querySelectorAll('.verdict-box').forEach(b => b.classList.remove('show'));
+  document.getElementById('stock-name').value = '';
+  ['price-entry','price-stop','price-target'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('risk-result').style.display = 'none';
+  document.getElementById('final-output').innerHTML = '';
+  ['next-1','next-2','next-3','next-4'].forEach(id =>
+    document.getElementById(id).disabled = true);
+  goStep(1);
+}
+</script>
+</body>
+</html>
